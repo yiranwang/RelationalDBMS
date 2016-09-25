@@ -28,6 +28,7 @@ protected:
 
 private:
     static PagedFileManager *_pf_manager;
+    int fd;                                                              // file descriptor 
 };
 
 
@@ -38,7 +39,8 @@ public:
     unsigned readPageCounter;
     unsigned writePageCounter;
     unsigned appendPageCounter;
-    
+    int fd;
+
     FileHandle();                                                         // Default constructor
     ~FileHandle();                                                        // Destructor
 
