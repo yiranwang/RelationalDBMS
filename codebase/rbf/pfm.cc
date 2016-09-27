@@ -29,20 +29,28 @@ PagedFileManager::~PagedFileManager()
 
 RC PagedFileManager::createFile(const string &fileName)
 {
-    //If O_CREAT and O_EXCL are set, open() shall fail if the file exists
+    //If O_CREAT and O_EXCL are set, open() will fail if the file exists
     int fd = open(fileName.c_str(), O_WRONLY | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (fd == -1) {
-        perror("createFile");
+        perror("Error in createFile");
         return(-1);
     }        
-    fprintf(stdout, "Successfully created file: %s.\n", fileName.c_str());
+    fprintf(stdout, "Successfully created file: %s. fd is %d.\n", fileName.c_str(), fd);
+    fflush(stdout);
     return 0;
 }
 
 
 RC PagedFileManager::destroyFile(const string &fileName)
 {
-    return remove(fileName.c_str());
+    int rc = remove(fileName.c_str());
+    if (rc == 0) {
+        fprintf(stdout, "Successfully destroyed file: %s\n", fileName.c_str());
+        fflush(stdout);
+    } else {
+        perror("Error in destroyFile");
+    }
+    return rc;
 }
 
 
@@ -55,7 +63,7 @@ RC PagedFileManager::openFile(const string &fileName, FileHandle &fileHandle)
 
     int fd = open(fileName.c_str(), O_RDWR, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (fd == -1) {
-        perror("openFile");
+        perror("Error in openFile");
         return -1;
     } else {
         fileHandle.fd = fd;
@@ -68,7 +76,14 @@ RC PagedFileManager::openFile(const string &fileName, FileHandle &fileHandle)
 
 RC PagedFileManager::closeFile(FileHandle &fileHandle)
 {
-    return close(fileHandle.fd);
+    int rc = close(fileHandle.fd);
+    if (rc == 0) {
+        fprintf(stdout, "Successfully closed file: fd = %d\n", fileHandle.fd);
+        fflush(stdout);
+    } else {
+        perror("Error in closeFile");
+    }
+    return rc;
 }
 
 
@@ -94,7 +109,7 @@ RC FileHandle::readPage(PageNum pageNum, void *data)
     }
     unsigned totalPages = getNumberOfPages();
     if (pageNum >= totalPages) {
-        fprintf(stderr, "Error in readPage: pageNum: %d > total # of pages: %d.\n", pageNum, totalPages);
+        fprintf(stderr, "Error in readPage: pageNum: %d >= total # of pages: %d.\n", pageNum, totalPages);
         return -1;
     }
     if (lseek(fd, 0, SEEK_SET) < 0) {
@@ -102,8 +117,8 @@ RC FileHandle::readPage(PageNum pageNum, void *data)
         return -1;
     }
     off_t bytesRead = read(fd, data, PAGE_SIZE);
-    perror("Reading file error");
     if (bytesRead == (off_t) -1) {
+        perror("error in readPage");
         fprintf(stderr, "Error in readPage: failed to read file!\n");
         return -1;
     }
@@ -123,10 +138,11 @@ RC FileHandle::writePage(PageNum pageNum, const void *data)
     }
     unsigned totalPages = getNumberOfPages();
     if (pageNum >= totalPages) {
-        fprintf(stderr, "Error in writePage: pageNum: %d > total # of pages: %d.\n", pageNum, totalPages);
+        fprintf(stderr, "Error in writePage: pageNum: %d >= total # of pages: %d.\n", pageNum, totalPages);
         return -1;
     }
     lseek(fd, pageNum * PAGE_SIZE, SEEK_SET);
+    fprintf(stderr, "OK\n");
     if (write(fd, data, PAGE_SIZE) < 0) {
         fprintf(stderr, "Error in writePage: write failed!\n");
     }
