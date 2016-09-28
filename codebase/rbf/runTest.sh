@@ -6,7 +6,7 @@
 ./rbftest5
 ./rbftest6
 ./rbftest7
-#./rbftest8
+./rbftest8
 #./rbftest9
 #./rbftest10
 #./rbftest11

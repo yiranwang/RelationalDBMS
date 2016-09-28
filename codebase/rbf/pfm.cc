@@ -112,7 +112,7 @@ RC FileHandle::readPage(PageNum pageNum, void *data)
         fprintf(stderr, "Error in readPage: pageNum: %d >= total # of pages: %d.\n", pageNum, totalPages);
         return -1;
     }
-    if (lseek(fd, (off_t) (pageNum * PAGE_SIZE), SEEK_SET) < 0) {
+    if (lseek(fd, pageNum * PAGE_SIZE, SEEK_SET) < 0) {
         fprintf(stderr, "Error in readPage: failed to locate the page!\n");
         return -1;
     }
@@ -120,10 +120,6 @@ RC FileHandle::readPage(PageNum pageNum, void *data)
     if (bytesRead == (off_t) -1) {
         perror("error in readPage");
         fprintf(stderr, "Error in readPage: failed to read file!\n");
-        return -1;
-    }
-    if((int)bytesRead != PAGE_SIZE) {
-        fprintf(stderr, "Error in readPage: Bytes Read: %d, does not match PageSize: %d\n", (int)bytesRead, PAGE_SIZE);
         return -1;
     }
     readPageCounter++;
