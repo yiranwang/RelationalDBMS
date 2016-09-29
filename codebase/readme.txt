@@ -18,3 +18,11 @@ Project 1:
 - By default you should not change those functions of the PagedFileManager,
   FileHandle, and RecordBasedFileManager classes defined in rbf/pfm.h and rbf/rbfm.h.
   If you think some changes are really necessary, please contact us first.
+
+
+
+
+Info during implementing:
+
+Page structure:
+https://technet.microsoft.com/en-us/library/ms190969(v=sql.105).aspx
