@@ -1,7 +1,7 @@
 #include "pfm.h"
 #include <fcntl.h>
-#include <stdio.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -29,60 +29,82 @@ PagedFileManager::~PagedFileManager()
 
 RC PagedFileManager::createFile(const string &fileName)
 {
-    //If O_CREAT and O_EXCL are set, open() will fail if the file exists
-    int fd = open(fileName.c_str(), O_WRONLY | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-    if (fd == -1) {
-        perror("Error in createFile");
-        return(-1);
-    }        
-    fprintf(stdout, "Successfully created file: %s. fd is %d.\n", fileName.c_str(), fd);
-    fflush(stdout);
-    return 0;
+	int fd = open(fileName.c_str(), O_CREAT | O_WRONLY | O_EXCL, S_IRWXU | S_IRWXO);
+
+	if (fd == -1) {
+		fprintf(stderr, "File %s creation failed.\n", fileName.c_str());
+
+		return -1;
+
+	} else {
+
+		fprintf(stdout, "File %s has been created.\n", fileName.c_str());
+
+		return 0;
+	}
+    
 }
 
 
 RC PagedFileManager::destroyFile(const string &fileName)
 {
-    int rc = remove(fileName.c_str());
-    if (rc == 0) {
-        fprintf(stdout, "Successfully destroyed file: %s\n", fileName.c_str());
-        fflush(stdout);
-    } else {
-        perror("Error in destroyFile");
-    }
+	int rc = remove(fileName.c_str());
+
+	if (rc == 0) {
+
+		fprintf(stdout, "File %s has been destroyed.\n", fileName.c_str());
+
+	} else {
+
+		fprintf(stderr, "File %s destroy failed.\n", fileName.c_str());
+	}
+
     return rc;
 }
 
 
 RC PagedFileManager::openFile(const string &fileName, FileHandle &fileHandle)
-{ 
-    if (fileHandle.fd > 0) {
-        fprintf(stderr, "Error! FileHandle is already a handle of an open file\n!");
-        return -1;
-    }
+{
+	if (fileHandle.fd >= 0) {
 
-    int fd = open(fileName.c_str(), O_RDWR, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-    if (fd == -1) {
-        perror("Error in openFile");
-        return -1;
-    } else {
-        fileHandle.fd = fd;
-        fprintf(stdout, "Successfully opened file. fd is: %d\n", fd);
-        fflush(stdout);
-        return 0;
-    }
+		fprintf(stderr, "The fileHandle is already a handle for another open file!\n");
+
+		return -1;
+	}
+
+	int fd = open(fileName.c_str(), O_RDWR);
+
+	if (fd == -1) {
+
+		fprintf(stderr, "File open failed!\n");
+
+		return -1;
+
+	}else {
+
+		fileHandle.fd = fd;
+
+		fprintf(stdout, "File %s has been opened successfully!\n", fileName.c_str());
+
+		return 0;
+
+	}
 }
 
 
 RC PagedFileManager::closeFile(FileHandle &fileHandle)
-{
-    int rc = close(fileHandle.fd);
-    if (rc == 0) {
-        fprintf(stdout, "Successfully closed file: fd = %d\n", fileHandle.fd);
-        fflush(stdout);
-    } else {
-        perror("Error in closeFile");
-    }
+{	
+	int rc = close(fileHandle.fd);
+
+	if (rc == 0) {
+
+		fprintf(stdout, "File has been closed successfully!\n");
+
+	}else {
+
+		fprintf(stderr, "File close failed!\n");
+	}
+
     return rc;
 }
 
@@ -103,85 +125,156 @@ FileHandle::~FileHandle()
 
 RC FileHandle::readPage(PageNum pageNum, void *data)
 {
-    if (fd < 0) {
-        fprintf(stderr, "File not open!");
-        return -1;
-    }
-    unsigned totalPages = getNumberOfPages();
-    if (pageNum >= totalPages) {
-        fprintf(stderr, "Error in readPage: pageNum: %d >= total # of pages: %d.\n", pageNum, totalPages);
-        return -1;
-    }
-    if (lseek(fd, pageNum * PAGE_SIZE, SEEK_SET) < 0) {
-        fprintf(stderr, "Error in readPage: failed to locate the page!\n");
-        return -1;
-    }
-    off_t bytesRead = read(fd, data, PAGE_SIZE);
-    if (bytesRead == (off_t) -1) {
-        perror("error in readPage");
-        fprintf(stderr, "Error in readPage: failed to read file!\n");
-        return -1;
-    }
-    readPageCounter++;
+
+	if (fd == -1) {
+
+		fprintf(stderr, "File has not been opened!\n");
+
+		return -1;
+	}
+
+	unsigned totalNum = getNumberOfPages();
+
+	if (pageNum >= totalNum) {
+
+		fprintf(stderr, "Page does not exist!\n");
+
+		return -1;
+
+	}
+
+	//locate offset to pageNum
+	off_t seek = lseek(fd, pageNum * PAGE_SIZE, SEEK_SET);
+
+	if (seek < 0) {
+
+		fprintf(stderr, "Page reading failed!\n");
+
+		return -1;
+	}
+
+	off_t bytesRead = read(fd, data, PAGE_SIZE);
+
+	if (bytesRead == (off_t)-1) {
+
+		fprintf(stderr, "Page reading failed!\n");
+
+		return -1;
+	}
+
+	readPageCounter++;
+
     return 0;
 }
 
+
 RC FileHandle::writePage(PageNum pageNum, const void *data)
-{
-    if (fd < 0) {
-        fprintf(stderr, "File not open!");
-        return -1;
-    }
-    unsigned totalPages = getNumberOfPages();
-    if (pageNum >= totalPages) {
-        fprintf(stderr, "Error in writePage: pageNum: %d >= total # of pages: %d.\n", pageNum, totalPages);
-        return -1;
-    }
-    lseek(fd, pageNum * PAGE_SIZE, SEEK_SET);
-    fprintf(stderr, "OK\n");
-    if (write(fd, data, PAGE_SIZE) < 0) {
-        fprintf(stderr, "Error in writePage: write failed!\n");
-    }
-    writePageCounter++;
+{	
+	if (fd == -1) {
+
+		fprintf(stderr, "File has not been opened!\n");
+
+		return -1;
+	}
+
+	unsigned totalNum = getNumberOfPages();
+
+	if (pageNum >= totalNum) {
+
+		fprintf(stderr, "Page does not exist!\n");
+
+		return -1;
+
+	}
+
+	//locate offset to pageNum
+	off_t seek = lseek(fd, pageNum * PAGE_SIZE, SEEK_SET);
+
+	if (seek < 0) {
+
+		fprintf(stderr, "Page writing failed!\n");
+
+		return -1;
+	}
+
+	ssize_t bytesWrite = write(fd, data, PAGE_SIZE);
+
+	if (bytesWrite < 0) {
+
+		fprintf(stderr, "Page writing failed!\n");
+
+		return -1;	
+
+	}
+
+	writePageCounter++;
+
     return 0;
 }
 
 
 RC FileHandle::appendPage(const void *data)
 {
-    if (fd < 0) {
-        fprintf(stderr, "File not open!");
-        return -1;
-    }
-    lseek(fd, 0, SEEK_END);                                            // place position at the end
-    if (write(fd, data, PAGE_SIZE) < 0) {
-        fprintf(stderr, "Error in appendPage: write failed!\n");
-        return -1;
-    }
-    appendPageCounter++;
+	if (fd == -1) {
+
+		fprintf(stderr, "File has not been opened!\n");
+
+		return -1;
+	}
+
+	off_t seek = lseek(fd, 0, SEEK_END);
+
+	if (seek < 0) {
+
+		fprintf(stderr, "Page appending failed!\n");
+
+		return -1;
+	}
+
+	ssize_t bytesWrite = write(fd, data, PAGE_SIZE);
+
+	if (bytesWrite < 0) {
+
+		fprintf(stderr, "Page appending failed!bytesWrite\n");
+
+		return -1;	
+
+	}
+
+	appendPageCounter++;
+
     return 0;
 }
 
 
 unsigned FileHandle::getNumberOfPages()
-{
-    if (fd < 0) {
-        fprintf(stderr, "File not open!");
-        return 0;
-    }
-    unsigned long fileSize = lseek(fd, 0, SEEK_END);                // place position at the end
-    unsigned pageNumber  = fileSize / PAGE_SIZE;
-    lseek(fd, 0, SEEK_SET);                                         // place position at the beginning
-    fprintf(stderr, "number of page is %d.\n", pageNumber);
-    return pageNumber;
+{	
+	if (fd == -1) {
+
+		fprintf(stderr, "File has not been opened!\n");
+
+		return 0;
+	}
+
+	unsigned long fileSize = lseek(fd, 0, SEEK_END);
+
+	unsigned totalNum = fileSize / PAGE_SIZE;
+
+	lseek(fd, 0, SEEK_SET);
+
+	fprintf(stdout, "Number of pages is %d.\n", totalNum);
+
+    return totalNum;
 }
 
 
 RC FileHandle::collectCounterValues(unsigned &readPageCount, unsigned &writePageCount, unsigned &appendPageCount)
 {
     readPageCount = readPageCounter;
+
     writePageCount = writePageCounter;
+
     appendPageCount = appendPageCounter;
+
     return 0;
 }
-

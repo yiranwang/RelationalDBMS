@@ -1,6 +1,4 @@
-Cao ni mei
 
-Project 1:
 - Modify the "CODEROOT" variable in makefile.inc to point to the root
   of your code base if you can't compile the code.
  
@@ -20,11 +18,3 @@ Project 1:
 - By default you should not change those functions of the PagedFileManager,
   FileHandle, and RecordBasedFileManager classes defined in rbf/pfm.h and rbf/rbfm.h.
   If you think some changes are really necessary, please contact us first.
-
-
-
-
-Info during implementing:
-
-Page structure:
-https://technet.microsoft.com/en-us/library/ms190969(v=sql.105).aspx

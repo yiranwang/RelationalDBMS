@@ -84,6 +84,13 @@ int RBFTest_12(RecordBasedFileManager *rbfm) {
 
         int size = 0;
         prepareLargeRecord2(recordDescriptor.size(), nullsIndicator, i, record, &size);
+
+        cout << "record data:" << endl;
+        rbfm->printRecord(recordDescriptor, record);
+
+        cout << "returnedData data:" << endl;
+        rbfm->printRecord(recordDescriptor, returnedData);
+
         if (memcmp(returnedData, record, size) != 0) {
             cout << "Test Case 12 Failed!" << endl << endl;
             free(record);

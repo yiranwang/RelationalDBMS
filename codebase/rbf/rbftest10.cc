@@ -98,6 +98,7 @@ int RBFTest_10(RecordBasedFileManager *rbfm) {
         if (i % 1000 == 0) {
             cout << endl << "Returned Data:" << endl;
             rbfm->printRecord(recordDescriptor, returnedData);
+            rbfm->printRecord(recordDescriptor, record);
         }
 
         int size = 0;
