@@ -7,7 +7,8 @@
 ./rbftest6
 ./rbftest7
 ./rbftest8
-#./rbftest9
-#./rbftest10
-#./rbftest11
-#./rbftest12
+./rbftest8b
+./rbftest9
+./rbftest10
+./rbftest11
+./rbftest12

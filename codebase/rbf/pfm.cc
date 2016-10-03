@@ -138,7 +138,6 @@ RC FileHandle::writePage(PageNum pageNum, const void *data)
         return -1;
     }
     lseek(fd, pageNum * PAGE_SIZE, SEEK_SET);
-    fprintf(stderr, "OK\n");
     if (write(fd, data, PAGE_SIZE) < 0) {
         fprintf(stderr, "Error in writePage: write failed!\n");
     }
@@ -172,7 +171,6 @@ unsigned FileHandle::getNumberOfPages()
     unsigned long fileSize = lseek(fd, 0, SEEK_END);                // place position at the end
     unsigned pageNumber  = fileSize / PAGE_SIZE;
     lseek(fd, 0, SEEK_SET);                                         // place position at the beginning
-    fprintf(stderr, "number of page is %d.\n", pageNumber);
     return pageNumber;
 }
 
@@ -182,6 +180,29 @@ RC FileHandle::collectCounterValues(unsigned &readPageCount, unsigned &writePage
     readPageCount = readPageCounter;
     writePageCount = writePageCounter;
     appendPageCount = appendPageCounter;
+    return 0;
+}
+
+
+RC FileHandle::readPageHeader(PageNum pageNum, void *data) {
+    if (fd < 0) {
+        fprintf(stderr, "File not open!");
+        return -1;
+    }
+    unsigned totalPages = getNumberOfPages();
+    if (pageNum >= totalPages) {
+        fprintf(stderr, "Error in readPage: pageNum: %d >= total # of pages: %d.\n", pageNum, totalPages);
+        return -1;
+    }
+    if (lseek(fd, pageNum * PAGE_SIZE, SEEK_SET) < 0) {
+        perror("error in readHeader");
+        return -1;
+    }
+    off_t bytesRead = read(fd, data, HEADER_SIZE);
+    if (bytesRead == (off_t) -1) {
+        perror("error in readHeader");
+        return -1;
+    }
     return 0;
 }
 

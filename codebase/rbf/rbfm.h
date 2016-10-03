@@ -9,11 +9,24 @@
 
 using namespace std;
 
+//  Record format
+//  number of fields: short, 2 bytes
+//  null indicator: n bytes
+//  fields:
+//      case 1: type == string
+//          int length + "ABCD\n": so 4 + str.length + 1 bytes
+//      case 2: type == int / float
+//          4 bytes only
+//
+// free space
+//
+// offset(2 bytes) + 
 // Record ID
+
 typedef struct
 {
-  unsigned pageNum;    // page number
-  unsigned slotNum;    // slot number in the page
+    unsigned pageNum;    // page number
+    unsigned slotNum;    // slot number in the page
 } RID;
 
 
@@ -56,29 +69,51 @@ The scan iterator is NOT required to be implemented for the part 1 of the projec
 
 class RBFM_ScanIterator {
 public:
-  RBFM_ScanIterator() {};
-  ~RBFM_ScanIterator() {};
+    RBFM_ScanIterator() {};
+    ~RBFM_ScanIterator() {};
 
-  // Never keep the results in the memory. When getNextRecord() is called, 
-  // a satisfying record needs to be fetched from the file.
-  // "data" follows the same format as RecordBasedFileManager::insertRecord().
-  RC getNextRecord(RID &rid, void *data) { return RBFM_EOF; };
-  RC close() { return -1; };
+    // Never keep the results in the memory. When getNextRecord() is called, 
+    // a satisfying record needs to be fetched from the file.
+    // "data" follows the same format as RecordBasedFileManager::insertRecord().
+    RC getNextRecord(RID &rid, void *data) { return RBFM_EOF; };
+    RC close() { return -1; };
 };
 
 
 class RecordBasedFileManager
 {
 public:
-  static RecordBasedFileManager* instance();
+    static RecordBasedFileManager* instance();
 
-  RC createFile(const string &fileName);
+    // ====== start of self defined methods =======
+    RC getNullIndicatorSize(const int fieldCount); 
+    
+    short getRecordSize(const vector<Attribute> &recordDescriptor, const void *data);
+
+    Page initializePage(FileHandle &fileHandle, const unsigned pageNum);
+
+    RC findInsertLocation(FileHandle &fileHandle, const short recordSize, RID &rid, short &offset);
+
+    RC readSlotFromPage(const Page &page, const short slotNum, Slot &slot);
+
+    RC insertSlotToPage(Page &page, const short slotNum, const Slot &slot);
+
+    RC insertRecordToPage(Page &page, const short offset, const void *record, const short recordSize);
+
+    int getIntData(int offset, const void* data);
+
+    float getFloatData(int offset, const void* data);
+    
+    RC getVarCharData(int offset, const void* data, char* varChar, const int varCharLength);
+    // ====== end of self defined methods ========
+
+    RC createFile(const string &fileName);
   
-  RC destroyFile(const string &fileName);
+    RC destroyFile(const string &fileName);
   
-  RC openFile(const string &fileName, FileHandle &fileHandle);
+    RC openFile(const string &fileName, FileHandle &fileHandle);
   
-  RC closeFile(FileHandle &fileHandle);
+    RC closeFile(FileHandle &fileHandle);
 
   //  Format of the data passed into the function is the following:
   //  [n byte-null-indicators for y fields] [actual value for the first field] [actual value for the second field] ...

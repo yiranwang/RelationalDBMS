@@ -6,9 +6,49 @@ typedef int RC;
 typedef char byte;
 
 #define PAGE_SIZE 4096
+#define HEADER_SIZE 96
+#define DATA_SIZE 4000
+#define SLOT_START 1024
 #include <string>
 #include <climits>
 using namespace std;
+
+
+// ========= Start of self defined structures ==========
+typedef struct
+{
+    unsigned pageNumber;        // page number
+    short recordCount;          // number of records on this page
+    short freeSpace;            // size of free space
+    short offset;               // starting address of free space
+
+    char misc[86];
+
+} PageHeader;
+
+typedef struct
+{
+    /*
+     *  header(tentative fields):
+     *      (short)number of records
+     *      (short)free space size
+     *  data:
+     *      rows of records (grows downwards)
+     *      free space
+     *      (short)offsets (grows backwards)
+     */
+    PageHeader header;
+    char data[DATA_SIZE];
+} Page;
+
+typedef struct
+{
+    short offset;
+    short length;
+} Slot;
+
+// =========== End of self defined structures ========
+
 
 class FileHandle;
 
@@ -49,6 +89,8 @@ public:
     unsigned getNumberOfPages();                                          // Get the number of pages in the file
     RC collectCounterValues(unsigned &readPageCount, unsigned &writePageCount, unsigned &appendPageCount);  // Put the current counter values into variables
 
+    // self defined methods
+    RC readPageHeader(PageNum pageNum, void *data);
 }; 
 
 #endif
