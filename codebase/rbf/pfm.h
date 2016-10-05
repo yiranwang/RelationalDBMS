@@ -5,6 +5,8 @@ typedef unsigned PageNum;
 typedef int RC;
 typedef char byte;
 
+#define DEBUG 0
+
 #define PAGE_SIZE 4096
 #define HEADER_SIZE 96
 #define DATA_SIZE 4000
@@ -79,6 +81,7 @@ public:
     unsigned writePageCounter;
     unsigned appendPageCounter;
     int fd;                                                               // file descriptor
+    int totalPages;
 
     FileHandle();                                                         // Default constructor
     ~FileHandle();                                                        // Destructor
@@ -86,7 +89,7 @@ public:
     RC readPage(PageNum pageNum, void *data);                             // Get a specific page
     RC writePage(PageNum pageNum, const void *data);                      // Write a specific page
     RC appendPage(const void *data);                                      // Append a specific page
-    unsigned getNumberOfPages();                                          // Get the number of pages in the file
+    unsigned getNumberOfPages();                                                // Get the number of pages in the file
     RC collectCounterValues(unsigned &readPageCount, unsigned &writePageCount, unsigned &appendPageCount);  // Put the current counter values into variables
 
     // self defined methods

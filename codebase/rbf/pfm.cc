@@ -32,11 +32,9 @@ RC PagedFileManager::createFile(const string &fileName)
     //If O_CREAT and O_EXCL are set, open() will fail if the file exists
     int fd = open(fileName.c_str(), O_WRONLY | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (fd == -1) {
-        perror("Error in createFile");
-        return(-1);
+        if(DEBUG) perror("Error in createFile");
+        return -1;
     }        
-    fprintf(stdout, "Successfully created file: %s. fd is %d.\n", fileName.c_str(), fd);
-    fflush(stdout);
     return 0;
 }
 
@@ -44,12 +42,6 @@ RC PagedFileManager::createFile(const string &fileName)
 RC PagedFileManager::destroyFile(const string &fileName)
 {
     int rc = remove(fileName.c_str());
-    if (rc == 0) {
-        fprintf(stdout, "Successfully destroyed file: %s\n", fileName.c_str());
-        fflush(stdout);
-    } else {
-        perror("Error in destroyFile");
-    }
     return rc;
 }
 
@@ -57,18 +49,14 @@ RC PagedFileManager::destroyFile(const string &fileName)
 RC PagedFileManager::openFile(const string &fileName, FileHandle &fileHandle)
 { 
     if (fileHandle.fd > 0) {
-        fprintf(stderr, "Error! FileHandle is already a handle of an open file\n!");
         return -1;
     }
 
     int fd = open(fileName.c_str(), O_RDWR, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (fd == -1) {
-        perror("Error in openFile");
         return -1;
     } else {
         fileHandle.fd = fd;
-        fprintf(stdout, "Successfully opened file. fd is: %d\n", fd);
-        fflush(stdout);
         return 0;
     }
 }
@@ -77,12 +65,6 @@ RC PagedFileManager::openFile(const string &fileName, FileHandle &fileHandle)
 RC PagedFileManager::closeFile(FileHandle &fileHandle)
 {
     int rc = close(fileHandle.fd);
-    if (rc == 0) {
-        fprintf(stdout, "Successfully closed file: fd = %d\n", fileHandle.fd);
-        fflush(stdout);
-    } else {
-        perror("Error in closeFile");
-    }
     return rc;
 }
 
@@ -93,6 +75,7 @@ FileHandle::FileHandle()
     writePageCounter = 0;
     appendPageCounter = 0;
     fd = -1;
+    totalPages = -1;
 }
 
 
@@ -104,22 +87,25 @@ FileHandle::~FileHandle()
 RC FileHandle::readPage(PageNum pageNum, void *data)
 {
     if (fd < 0) {
-        fprintf(stderr, "File not open!");
+        if(DEBUG) fprintf(stderr, "File not open!");
         return -1;
     }
     unsigned totalPages = getNumberOfPages();
     if (pageNum >= totalPages) {
-        fprintf(stderr, "Error in readPage: pageNum: %d >= total # of pages: %d.\n", pageNum, totalPages);
+        if(DEBUG) fprintf(stderr, "Error in readPage: pageNum: %d >= total # of pages: %d.\n", pageNum, totalPages);
         return -1;
     }
     if (lseek(fd, pageNum * PAGE_SIZE, SEEK_SET) < 0) {
-        fprintf(stderr, "Error in readPage: failed to locate the page!\n");
+        if(DEBUG) fprintf(stderr, "Error in readPage: failed to locate the page!\n");
         return -1;
     }
     off_t bytesRead = read(fd, data, PAGE_SIZE);
     if (bytesRead == (off_t) -1) {
-        perror("error in readPage");
-        fprintf(stderr, "Error in readPage: failed to read file!\n");
+        
+        if(DEBUG) {
+            perror("error in readPage");
+            fprintf(stderr, "Error in readPage: failed to read file!\n");
+        }
         return -1;
     }
     readPageCounter++;
@@ -129,17 +115,17 @@ RC FileHandle::readPage(PageNum pageNum, void *data)
 RC FileHandle::writePage(PageNum pageNum, const void *data)
 {
     if (fd < 0) {
-        fprintf(stderr, "File not open!");
+        if(DEBUG) fprintf(stderr, "File not open!");
         return -1;
     }
     unsigned totalPages = getNumberOfPages();
     if (pageNum >= totalPages) {
-        fprintf(stderr, "Error in writePage: pageNum: %d >= total # of pages: %d.\n", pageNum, totalPages);
+        if(DEBUG) fprintf(stderr, "Error in writePage: pageNum: %d >= total # of pages: %d.\n", pageNum, totalPages);
         return -1;
     }
     lseek(fd, pageNum * PAGE_SIZE, SEEK_SET);
     if (write(fd, data, PAGE_SIZE) < 0) {
-        fprintf(stderr, "Error in writePage: write failed!\n");
+        if(DEBUG) fprintf(stderr, "Error in writePage: write failed!\n");
     }
     writePageCounter++;
     return 0;
@@ -149,15 +135,18 @@ RC FileHandle::writePage(PageNum pageNum, const void *data)
 RC FileHandle::appendPage(const void *data)
 {
     if (fd < 0) {
-        fprintf(stderr, "File not open!");
+        if(DEBUG) fprintf(stderr, "File not open!");
         return -1;
     }
+    // pageNum before appending
+    unsigned curTotalPages = getNumberOfPages();
     lseek(fd, 0, SEEK_END);                                            // place position at the end
     if (write(fd, data, PAGE_SIZE) < 0) {
-        fprintf(stderr, "Error in appendPage: write failed!\n");
+        if(DEBUG) fprintf(stderr, "Error in appendPage: write failed!\n");
         return -1;
     }
     appendPageCounter++;
+    totalPages = ++curTotalPages;
     return 0;
 }
 
@@ -165,13 +154,18 @@ RC FileHandle::appendPage(const void *data)
 unsigned FileHandle::getNumberOfPages()
 {
     if (fd < 0) {
-        fprintf(stderr, "File not open!");
+        if(DEBUG)  fprintf(stderr, "File not open!");
         return 0;
     }
+
+    // initialize pageNum  
+    if (totalPages < 0) {
+        lseek(fd, 0, SEEK_SET);                                         // place position at the beginning
     unsigned long fileSize = lseek(fd, 0, SEEK_END);                // place position at the end
-    unsigned pageNumber  = fileSize / PAGE_SIZE;
-    lseek(fd, 0, SEEK_SET);                                         // place position at the beginning
-    return pageNumber;
+        totalPages  = fileSize / PAGE_SIZE;
+        lseek(fd, 0, SEEK_SET);                                         // place position at the beginning
+    }
+    return (unsigned)totalPages;
 }
 
 
@@ -186,21 +180,20 @@ RC FileHandle::collectCounterValues(unsigned &readPageCount, unsigned &writePage
 
 RC FileHandle::readPageHeader(PageNum pageNum, void *data) {
     if (fd < 0) {
-        fprintf(stderr, "File not open!");
+        if(DEBUG) fprintf(stderr, "File not open!");
         return -1;
     }
-    unsigned totalPages = getNumberOfPages();
-    if (pageNum >= totalPages) {
-        fprintf(stderr, "Error in readPage: pageNum: %d >= total # of pages: %d.\n", pageNum, totalPages);
+    if (pageNum >= (unsigned)totalPages) {
+        if(DEBUG) fprintf(stderr, "Error in readPage: pageNum: %d >= total # of pages: %d.\n", pageNum, totalPages);
         return -1;
     }
     if (lseek(fd, pageNum * PAGE_SIZE, SEEK_SET) < 0) {
-        perror("error in readHeader");
+        if(DEBUG) perror("error in readHeader");
         return -1;
     }
     off_t bytesRead = read(fd, data, HEADER_SIZE);
     if (bytesRead == (off_t) -1) {
-        perror("error in readHeader");
+        if(DEBUG) perror("error in readHeader");
         return -1;
     }
     return 0;

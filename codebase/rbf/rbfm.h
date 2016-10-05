@@ -87,16 +87,16 @@ public:
 
     // ====== start of self defined methods =======
     RC getNullIndicatorSize(const int fieldCount); 
-    
-    short getRecordSize(const vector<Attribute> &recordDescriptor, const void *data);
 
-    Page initializePage(FileHandle &fileHandle, const unsigned pageNum);
+    RC composeRecord(const vector<Attribute> &recordDescriptor, const void *data, void *tmpRecord, short &size);
+
+    Page initializePage(const unsigned pageNum);
 
     RC findInsertLocation(FileHandle &fileHandle, const short recordSize, RID &rid, short &offset);
 
     RC readSlotFromPage(const Page &page, const short slotNum, Slot &slot);
 
-    RC insertSlotToPage(Page &page, const short slotNum, const Slot &slot);
+    RC writeSlotToPage(Page &page, const short slotNum, const Slot &slot);
 
     RC insertRecordToPage(Page &page, const short offset, const void *record, const short recordSize);
 

@@ -1,21 +1,60 @@
 1. Basic information
-Student ID : 
-Student Name : 
-OS (bit) :
-gcc version :
+Student ID : 10283095 
+Student Name : Rui Liu
+OS (bit) :  64
+gcc version :   4.8.5
 
 
 2. Internal Record Format
 - Show your record format design and describe how your design satisfies O(1) field access. If not, just mention that you haven't implemented this feature.
+    Offset of each field is stored in each record, so O(1) field access is realized.
+
+    Record header format:
+
+        short(2-byte)       short           short                   short           
+        |fieldCount| field_0 offset | field_1 offset |...| field_n-1 offset| 
+    
+    Record data format:
+    
+                                int(4-byte)       char(1-byte) 
+        TypeVarChar:            |varCharLen | char1 | char2 | char3 | char4 |....|
+                                
+                                  int/float (4-byte)
+        TypeInt/TypeReal:       |   int/float   |
+    
+
 - Describe how you store a VarChar field.
+    Already explained in the section above: length of char array + char array
 
 
 3. Page Format
 - Show your page format design
+    
+    Page header(96-byte): pageNumber(unsigned), recordCount(short), freeSpace(short), offset(short), misc[86] for future use.
+    data[4000]
 
+    data[4000] is organized as:
+        record_0, record_1, ..., record_n,
+        free space,
+        slot_n, slot_n-1, ..., slot_0
+
+    slot_i format:
+        offset(short): starting address of record_i
+        length(short): length of this record_i
 
 4. Implementation Detail
 - Other implementation details goes here.
+    a. nullIndicator: each byte is extracted first, then use a bit mask to determine if a field is NULL;
+    b. insert a record:
+        compose an inner record from the API record, returns recordSize
+        given the size of the inner record, find the location to insert it, returns rid, offset
+        read the page out into memory
+        compose slot
+        write the inner record and slot into the page
+        write the page into file
+
+    c. read a record:
+        allocate a piece of memory, read the inner record to it, compose an API record from the inner record
 
 
 5. Other (optional)
