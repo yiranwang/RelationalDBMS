@@ -157,7 +157,6 @@ unsigned FileHandle::getNumberOfPages()
         if(DEBUG)  fprintf(stderr, "File not open!");
         return 0;
     }
-
     // initialize pageNum  
     if (totalPages < 0) {
         lseek(fd, 0, SEEK_SET);                                         // place position at the beginning

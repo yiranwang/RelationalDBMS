@@ -1,8 +1,8 @@
 #include "rbfm.h"
+#include <cstring>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <cstring>
 
 using namespace std;
 
@@ -46,10 +46,10 @@ int RecordBasedFileManager::getNullIndicatorSize(const int fieldCount) {
 }
 
 // compose a record given a data with null indicator
-// record format:
-// short: fieldCount
-// short[filedCount]: field offset, -1 if it's null
-// field values
+//   record format:
+//      short: fieldCount
+//      short [filedCount]: field offset, -1 if it's null
+//      field values
 RC RecordBasedFileManager::composeRecord(const vector<Attribute> &recordDescriptor, const void *data, void *tmpRecord, short &size) {
     bool nullBit = false;
     int fieldCount = recordDescriptor.size();
@@ -96,7 +96,6 @@ RC RecordBasedFileManager::composeRecord(const vector<Attribute> &recordDescript
                 // for a null field, write -1 to its field offset
                 *(short*)((char*)tmpRecord + sizeof(short) * (1 + fieldIndex)) = -1;
             }
-
     }
 
     size = recordOffset;
@@ -199,7 +198,7 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
     // write page into file
     fileHandle.writePage(rid.pageNum, &page);
     if(DEBUG) printf("write to file done\n");
-
+    // free the allocated memory
     free(tmpRecord);
     if(DEBUG) printf("free done\n");
     return 0;
@@ -254,8 +253,6 @@ RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attri
         bitPos--;
         bitPos = (CHAR_BIT + bitPos) % CHAR_BIT;
     }
-
-
     return 0;
 }
 
