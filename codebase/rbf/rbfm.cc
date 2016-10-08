@@ -8,20 +8,17 @@ using namespace std;
 
 RecordBasedFileManager* RecordBasedFileManager::_rbf_manager = 0;
 
-RecordBasedFileManager* RecordBasedFileManager::instance()
-{
+RecordBasedFileManager* RecordBasedFileManager::instance() {
     if(!_rbf_manager)
         _rbf_manager = new RecordBasedFileManager();
 
     return _rbf_manager;
 }
 
-RecordBasedFileManager::RecordBasedFileManager()
-{
+RecordBasedFileManager::RecordBasedFileManager() {
 }
 
-RecordBasedFileManager::~RecordBasedFileManager()
-{
+RecordBasedFileManager::~RecordBasedFileManager() {
 }
 
 RC RecordBasedFileManager::createFile(const string &fileName) {
@@ -50,7 +47,8 @@ int RecordBasedFileManager::getNullIndicatorSize(const int fieldCount) {
 //      short: fieldCount
 //      short [filedCount]: field offset, -1 if it's null
 //      field values
-RC RecordBasedFileManager::composeRecord(const vector<Attribute> &recordDescriptor, const void *data, void *tmpRecord, short &size) {
+RC RecordBasedFileManager::composeRecord(const vector<Attribute> &recordDescriptor, 
+        const void *data, void *tmpRecord, short &size) {
     bool nullBit = false;
     int fieldCount = recordDescriptor.size();
     int nullIndicatorSize = getNullIndicatorSize(fieldCount);
@@ -81,7 +79,8 @@ RC RecordBasedFileManager::composeRecord(const vector<Attribute> &recordDescript
                 if (fieldAttr.type == TypeVarChar) {
                     // get varChar length
                     int varCharLen = *(int*)((char*)data + dataOffset);
-                    memcpy((char*)tmpRecord + recordOffset, (char*)data + dataOffset, sizeof(int) + varCharLen);
+                    memcpy((char*)tmpRecord + recordOffset, (char*)data + dataOffset, 
+                            sizeof(int) + varCharLen);
 
                     // move offset in data and record for next field
                     dataOffset += sizeof(int) + varCharLen;
@@ -105,7 +104,8 @@ RC RecordBasedFileManager::composeRecord(const vector<Attribute> &recordDescript
 // return an initialized page 
 Page RecordBasedFileManager::initializePage(const unsigned pageNum) {
     Page tmpPage = {};
-    tmpPage.header = {.pageNumber = pageNum, .recordCount = 0, .freeSpace = DATA_SIZE, .offset = HEADER_SIZE};
+    tmpPage.header = 
+        {.pageNumber = pageNum, .recordCount = 0, .freeSpace = DATA_SIZE, .offset = HEADER_SIZE};
     return tmpPage;    
 }
 
@@ -145,12 +145,10 @@ RC RecordBasedFileManager::findInsertLocation(FileHandle &fileHandle, const shor
     return 0;
 }
 
-
 RC RecordBasedFileManager::readSlotFromPage(Page *page, const short slotNum, Slot &slot) {
     memcpy(&slot, (char*)page + PAGE_SIZE - (slotNum + 1) * sizeof(Slot), sizeof(Slot));
     return 0;
 }
-
 
 RC RecordBasedFileManager::writeSlotToPage(Page *page, const short slotNum, const Slot &slot) {
     memcpy((char*)page + PAGE_SIZE - (slotNum + 1) * sizeof(Slot), &slot, sizeof(Slot));
@@ -158,8 +156,8 @@ RC RecordBasedFileManager::writeSlotToPage(Page *page, const short slotNum, cons
     return 0;
 }
 
-
-RC RecordBasedFileManager::insertRecordToPage(Page *page, const short offset, const void* record, const short recordSize) {
+RC RecordBasedFileManager::insertRecordToPage(Page *page, const short offset, 
+        const void* record, const short recordSize) {
     memcpy((char*)page + offset, record, recordSize);
     page->header.recordCount += 1;
     page->header.freeSpace -= recordSize;
@@ -167,8 +165,8 @@ RC RecordBasedFileManager::insertRecordToPage(Page *page, const short offset, co
     return 0;
 }
 
-
-RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const void *data, RID &rid) {
+RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, 
+        const vector<Attribute> &recordDescriptor, const void *data, RID &rid) {
     short offset = -1;
     short recordSize = -1;
     char *tmpRecord = (char*)malloc(PAGE_SIZE);
@@ -225,7 +223,8 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
     return 0;
 }
 
-RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, void *data) {
+RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, 
+        const vector<Attribute> &recordDescriptor, const RID &rid, void *data) {
     // read the page
     Page *page = new Page;
     fileHandle.readPage(rid.pageNum, page);
@@ -278,7 +277,8 @@ RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attri
             Attribute fieldAttr = recordDescriptor[fieldIndex];     
             if (fieldAttr.type == TypeVarChar) {
                 int varCharLen = *(int*)(innerRecord + recordOffset);
-                memcpy((char*)data + dataOffset, innerRecord + recordOffset, sizeof(int) + varCharLen);
+                memcpy((char*)data + dataOffset, innerRecord + recordOffset, 
+                        sizeof(int) + varCharLen);
                 dataOffset += varCharLen;
                 recordOffset += varCharLen;
             } else {
@@ -298,9 +298,8 @@ RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attri
     return 0;
 }
 
-
-RC RecordBasedFileManager::printRecord(const vector<Attribute> &recordDescriptor, const void *data) {
- 
+RC RecordBasedFileManager::printRecord(const vector<Attribute> &recordDescriptor, 
+        const void *data) {
     // Null-indicators initialization
     bool nullBit = false;
     int fieldCount = recordDescriptor.size();
@@ -352,34 +351,29 @@ RC RecordBasedFileManager::printRecord(const vector<Attribute> &recordDescriptor
     return 0;
 }
 
-
-int RecordBasedFileManager::getIntData(int offset, const void* data)
-{
+int RecordBasedFileManager::getIntData(int offset, const void* data) {
     int intData;
     memcpy(&intData, (char *)data + offset, sizeof(int));
     return intData;
 }
 
-
-float RecordBasedFileManager::getFloatData(int offset, const void* data)
-{
+float RecordBasedFileManager::getFloatData(int offset, const void* data) {
     float floatData;
     memcpy(&floatData, (char *)data + offset, sizeof(float));
     return floatData;
 }
 
-
-RC RecordBasedFileManager::getVarCharData(int offset, const void* data, char* varChar, const int varCharLength)
-{
+RC RecordBasedFileManager::getVarCharData(int offset, const void* data, char* varChar, 
+        const int varCharLength) {
     memcpy(varChar, (char *)data + offset, varCharLength);
     varChar[varCharLength] = '\0';
     return 0;
 }
 
-
 //  ========== start of project 2 methods ============
 
-RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid) {
+RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, 
+        const vector<Attribute> &recordDescriptor, const RID &rid) {
 
     
     
@@ -387,25 +381,61 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
     return -1;
 }
 
-
-RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const void *data, const RID &rid) {
+RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, 
+        const vector<Attribute> &recordDescriptor, const void *data, const RID &rid) {
 
     return -1;
 }
 
-RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, const string &attributeName, void *data) {
+RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, 
+        const vector<Attribute> &recordDescriptor, const RID &rid, 
+        const string &attributeName, void *data) {
     
     void* record = malloc(PAGE_SIZE);    
     memset(record, 0, PAGE_SIZE);
-   
+
+    // read record out 
     if (readRecord(fileHandle, recordDescriptor, rid, record) < 0) {
         if (DEBUG) {
             printf("Read record failed\n");
         }
         return -1;
     }
-    
+    if (DEBUG) {
+        printf("read record out done\n");
+    }
 
+    // find the index of the target attribute
+    int attrIndex = 0;
+    for (; strcmp(recordDescriptor[attrIndex].name.c_str(), attributeName.c_str()) != 0 
+            && attrIndex < recordDescriptor.size(); attrIndex++) {
+    }
+    if (attrIndex == recordDescriptor.size()) {
+        if (DEBUG) {
+            printf("attribute not found\n");
+        }
+        free(record);
+        return -1;
+    }
+    printf("attribute index found for %s:%d\n", attributeName.c_str(), attrIndex);
+
+    // find the offset for the attribute
+    short attrOffset = *(short*)((short*)record + (1 + attrIndex) * sizeof(short)); 
+    if (attrOffset == -1) {
+        if (DEBUG) {
+            printf("attribute: %s is NULL\n", attributeName.c_str());
+        }
+        free(record);
+        return -1;
+    }
+    if (recordDescriptor[attrIndex].type == TypeVarChar) {
+        int varCharLen = *(int*)((char*)record + attrOffset);
+        memcpy(data, (char*)record + attrOffset, sizeof(int) + varCharLen);
+    } else {
+        memcpy(data, (char*)record + attrOffset, sizeof(int));
+    }
+
+    free(record);
     return 0;
 }
 

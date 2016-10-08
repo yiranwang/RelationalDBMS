@@ -45,9 +45,14 @@ typedef struct
 
 typedef struct
 {
-    short offset;
-    short length;
+    short offset;           // -1 for deleted records, tombstone
+    short length;           // -1 for redirected records, whose rid can be found by slot.offset
 } Slot;
+
+//  structure of records:
+//  short   short       short       ...     
+//  #field  f1_offset   f2_offset   ...     field1  field2  field3
+//  if offset == -1, this value is NULL
 
 // =========== End of self defined structures ========
 
