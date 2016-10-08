@@ -86,6 +86,7 @@ public:
     static RecordBasedFileManager* instance();
 
     // ====== start of self defined methods =======
+    // ==== start of project 1 ===
     RC getNullIndicatorSize(const int fieldCount); 
 
     RC composeRecord(const vector<Attribute> &recordDescriptor, const void *data, void *tmpRecord, short &size);
@@ -94,17 +95,27 @@ public:
 
     RC findInsertLocation(FileHandle &fileHandle, const short recordSize, RID &rid, short &offset);
 
-    RC readSlotFromPage(const Page &page, const short slotNum, Slot &slot);
+    RC readSlotFromPage(Page *page, const short slotNum, Slot &slot);
 
-    RC writeSlotToPage(Page &page, const short slotNum, const Slot &slot);
+    RC writeSlotToPage(Page *page, const short slotNum, const Slot &slot);
 
-    RC insertRecordToPage(Page &page, const short offset, const void *record, const short recordSize);
+    RC insertRecordToPage(Page *page, const short offset, const void *record, const short recordSize);
 
     int getIntData(int offset, const void* data);
 
     float getFloatData(int offset, const void* data);
     
     RC getVarCharData(int offset, const void* data, char* varChar, const int varCharLength);
+    // ==== end of project 1 ===
+
+    // ==== project 2 ===
+
+
+
+    // ==== project 2 ===
+
+
+
     // ====== end of self defined methods ========
 
     RC createFile(const string &fileName);

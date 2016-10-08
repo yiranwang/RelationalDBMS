@@ -146,24 +146,24 @@ RC RecordBasedFileManager::findInsertLocation(FileHandle &fileHandle, const shor
 }
 
 
-RC RecordBasedFileManager::readSlotFromPage(const Page &page, const short slotNum, Slot &slot) {
-    memcpy(&slot, (char*)(&page) + PAGE_SIZE - (slotNum + 1) * sizeof(Slot), sizeof(Slot));
+RC RecordBasedFileManager::readSlotFromPage(Page *page, const short slotNum, Slot &slot) {
+    memcpy(&slot, (char*)page + PAGE_SIZE - (slotNum + 1) * sizeof(Slot), sizeof(Slot));
     return 0;
 }
 
 
-RC RecordBasedFileManager::writeSlotToPage(Page &page, const short slotNum, const Slot &slot) {
-    memcpy((char*)(&page) + PAGE_SIZE - (slotNum + 1) * sizeof(Slot), &slot, sizeof(Slot));
-    page.header.freeSpace -= sizeof(Slot);
+RC RecordBasedFileManager::writeSlotToPage(Page *page, const short slotNum, const Slot &slot) {
+    memcpy((char*)page + PAGE_SIZE - (slotNum + 1) * sizeof(Slot), &slot, sizeof(Slot));
+    page->header.freeSpace -= sizeof(Slot);
     return 0;
 }
 
 
-RC RecordBasedFileManager::insertRecordToPage(Page &page, const short offset, const void* record, const short recordSize) {
-    memcpy((char*)(&page) + offset, record, recordSize);
-    page.header.recordCount += 1;
-    page.header.freeSpace -= recordSize;
-    page.header.offset += recordSize;
+RC RecordBasedFileManager::insertRecordToPage(Page *page, const short offset, const void* record, const short recordSize) {
+    memcpy((char*)page + offset, record, recordSize);
+    page->header.recordCount += 1;
+    page->header.freeSpace -= recordSize;
+    page->header.offset += recordSize;
     return 0;
 }
 
@@ -182,44 +182,71 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
     if(DEBUG) printf("find location done: offset=%d\n", offset);
 
     // read out the destination page
-    Page page = {};
-    fileHandle.readPage(rid.pageNum, &page); 
+    Page *page = new Page;
+    fileHandle.readPage(rid.pageNum, page);
     if(DEBUG) printf("page read out done: pageNum=%d\n", rid.pageNum);
 
     // write record onto page
-    insertRecordToPage(page, offset, tmpRecord, recordSize);
+    RC rcInsertRecordToPage = insertRecordToPage(page, offset, tmpRecord, recordSize);
     if(DEBUG) printf("insert record to page done\n");
     
     // write slot onto page
     Slot slot = {.offset = offset, .length = recordSize}; 
-    writeSlotToPage(page, rid.slotNum, slot);
+    RC rcWriteSlot = writeSlotToPage(page, rid.slotNum, slot);
     if(DEBUG) printf("write slot done\n");
 
     // write page into file
-    fileHandle.writePage(rid.pageNum, &page);
+    RC rcWritePageToFile = fileHandle.writePage(rid.pageNum, page);
     if(DEBUG) printf("write to file done\n");
     // free the allocated memory
     free(tmpRecord);
+    delete page;
+
     if(DEBUG) printf("free done\n");
+
+    if (rcInsertRecordToPage < 0 || rcWriteSlot < 0 || rcWritePageToFile < 0) {
+    	return -1;
+    }
+
     return 0;
 }
 
 RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, void *data) {
     // read the page
-    Page page = {};
-    fileHandle.readPage(rid.pageNum, &page);
-
+    Page *page = new Page;
+    fileHandle.readPage(rid.pageNum, page);
+    if(DEBUG) printf("read page from file done\n");
     // read the slot 
     Slot slot = {};
     readSlotFromPage(page, rid.slotNum, slot);
+    if(DEBUG) printf("read slot done\n");
     
+    // check if a record is inside the current page
+    // case 1: record is deleted
+    if (slot.offset < 0) {
+    	delete page;
+    	if(DEBUG) printf("The record to be read has been deleted!\n");
+    	return -1;
+    }
+    // case 2: record is redirected to another page
+    // because after being updated, the current page cannot hold it
+    else if (slot.length < -0) {
+    	RID nextRid = *(RID*)((char*)page + slot.offset);
+    	delete page;
+    	return readRecord(fileHandle, recordDescriptor, nextRid, data);
+    }
+
+    // case 3: normal case, the record is inside the current page
+
     // read the record inner format 
     char* innerRecord = (char*)malloc(PAGE_SIZE);
-    memcpy(innerRecord, (char*)(&page) + slot.offset, slot.length); 
+    memcpy(innerRecord, (char*)page + slot.offset, slot.length);
+    if(DEBUG) printf("copy inner record done\n");
     
     // get field count (short)
     short fieldCount = *(short*)innerRecord;
     if (fieldCount != (short)recordDescriptor.size()) {
+    	if(DEBUG) printf("Error: fieldCount != recordDescriptor.size()\n");
         return -1;
     } 
 
@@ -253,6 +280,7 @@ RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attri
         bitPos--;
         bitPos = (CHAR_BIT + bitPos) % CHAR_BIT;
     }
+    delete page;
     return 0;
 }
 
@@ -333,3 +361,30 @@ RC RecordBasedFileManager::getVarCharData(int offset, const void* data, char* va
     varChar[varCharLength] = '\0';
     return 0;
 }
+
+
+//  ========== start of project 2 methods ============
+
+RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid) {
+
+    return -1;
+}
+
+
+RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const void *data, const RID &rid) {
+
+    return -1;
+}
+
+RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, const string &attributeName, void *data) {
+    return -1;
+}
+
+//  ========== end of project 2 methods ============
+
+
+
+
+
+
+
