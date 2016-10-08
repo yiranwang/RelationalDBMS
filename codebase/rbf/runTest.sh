@@ -11,4 +11,4 @@
 ./rbftest9
 ./rbftest10
 ./rbftest11
-.rbftest12
+./rbftest12

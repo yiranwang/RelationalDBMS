@@ -183,30 +183,44 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
 
     // read out the destination page
     Page *page = new Page;
-    fileHandle.readPage(rid.pageNum, page);
+    if (fileHandle.readPage(rid.pageNum, page) < 0) {
+        if (DEBUG) {
+            printf("failed to read page out of file\n");
+        }
+    }
     if(DEBUG) printf("page read out done: pageNum=%d\n", rid.pageNum);
 
     // write record onto page
-    RC rcInsertRecordToPage = insertRecordToPage(page, offset, tmpRecord, recordSize);
+    if (insertRecordToPage(page, offset, tmpRecord, recordSize)) {
+        if (DEBUG) {
+            printf("failed to write record to page\n");
+        }
+    }
     if(DEBUG) printf("insert record to page done\n");
     
     // write slot onto page
     Slot slot = {.offset = offset, .length = recordSize}; 
-    RC rcWriteSlot = writeSlotToPage(page, rid.slotNum, slot);
+    if (writeSlotToPage(page, rid.slotNum, slot) < 0) {
+        if(DEBUG) {
+            printf("failed to write slot to page\n");
+        }
+        return -1;
+    }        
     if(DEBUG) printf("write slot done\n");
 
     // write page into file
-    RC rcWritePageToFile = fileHandle.writePage(rid.pageNum, page);
+    if (fileHandle.writePage(rid.pageNum, page) < 0) {
+        if (DEBUG) {
+            printf("failed to write page to file\n");
+        }
+
+    }
     if(DEBUG) printf("write to file done\n");
+
     // free the allocated memory
     free(tmpRecord);
     delete page;
-
-    if(DEBUG) printf("free done\n");
-
-    if (rcInsertRecordToPage < 0 || rcWriteSlot < 0 || rcWritePageToFile < 0) {
-    	return -1;
-    }
+    if(DEBUG) printf("free tmpRecord and page pointer done\n");
 
     return 0;
 }
@@ -367,6 +381,9 @@ RC RecordBasedFileManager::getVarCharData(int offset, const void* data, char* va
 
 RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid) {
 
+    
+    
+    
     return -1;
 }
 
@@ -377,7 +394,19 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
 }
 
 RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, const string &attributeName, void *data) {
-    return -1;
+    
+    void* record = malloc(PAGE_SIZE);    
+    memset(record, 0, PAGE_SIZE);
+   
+    if (readRecord(fileHandle, recordDescriptor, rid, record) < 0) {
+        if (DEBUG) {
+            printf("Read record failed\n");
+        }
+        return -1;
+    }
+    
+
+    return 0;
 }
 
 //  ========== end of project 2 methods ============
