@@ -173,7 +173,7 @@ RC RecordBasedFileManager::insertRecordToPage(Page *page, const short offset,
 
 RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, 
         const vector<Attribute> &recordDescriptor, const void *data, RID &rid) {
-    short insetOffset = -1;  // location on the page to insert the record
+    short insertOffset = -1;  // location on the page to insert the record
     short recordSize = -1;
     char *tmpRecord = (char*)malloc(PAGE_SIZE);
     // get tmpRecord, recordSize
@@ -188,7 +188,7 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle,
         printf("compose done: size=%d\n", recordSize);
     }
     // get rid, offset
-    findInsertLocation(fileHandle, recordSize, rid, insetOffset);
+    findInsertLocation(fileHandle, recordSize, rid, insertOffset);
     if(DEBUG) {
         printf("find location done: offset=%d\n", insertOffset);
     }
@@ -545,7 +545,7 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle,
                 printf("failed to insert record\n");
             }
             delete page;
-            free(updatedRecord);
+            free(updatedInnerRecord);
             return -1;
         }
         // fill the RID of target page on this page and set slot.length = -1
@@ -557,7 +557,7 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle,
 
     // make changes persistent and free memory
     writeSlotToPage(page, rid.slotNum, slot);
-    fileHandle.writePage(page, rid.pageNum);
+    fileHandle.writePage(rid.pageNum, page);
     delete page;
     free(updatedInnerRecord);
     return 0;
