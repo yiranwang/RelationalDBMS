@@ -106,7 +106,7 @@ RC RecordBasedFileManager::composeRecord(
 Page RecordBasedFileManager::initializePage(const unsigned pageNum) {
     Page tmpPage = {};
     tmpPage.header = {.pageNumber = pageNum, .slotCount = 0, 
-        .freeSpace = DATA_SIZE, .offset = HEADER_SIZE};
+        .freeSpace = DATA_SIZE, .freeSpaceOffset = HEADER_SIZE};
     return tmpPage;    
 }
 
@@ -143,7 +143,7 @@ RC RecordBasedFileManager::findInsertLocation(FileHandle &fileHandle,
         rid.pageNum = targetPageNum % totalPage;
         rid.slotNum = curHeader.slotCount;
     }
-    offset = curHeader.offset;
+    offset = curHeader.freeSpaceOffset;
     return 0;
 }
 
@@ -167,13 +167,13 @@ RC RecordBasedFileManager::insertRecordToPage(Page *page, const short offset,
     memcpy((char*)page + offset, record, recordSize);
     page->header.slotCount += 1;
     page->header.freeSpace -= recordSize;
-    page->header.offset += recordSize;
+    page->header.freeSpaceOffset += recordSize;
     return 0;
 }
 
 RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, 
         const vector<Attribute> &recordDescriptor, const void *data, RID &rid) {
-    short offset = -1;
+    short offset = -1;  // location on the page to insert the record
     short recordSize = -1;
     char *tmpRecord = (char*)malloc(PAGE_SIZE);
     // get tmpRecord, recordSize
@@ -386,7 +386,7 @@ RC RecordBasedFileManager::getVarCharData(int offset, const void* data,
 /*  Shift [start, start + length - 1] by delta bytes
  *  shiftLeft: true = left, false = right
  */
-void RecordBasedFileManageer::shiftBytes(char *start, int length, 
+void RecordBasedFileManager::shiftBytes(char *start, int length, 
         int delta, bool shiftLeft) {
     // starting address of shifted piece 
     char* dest = shiftLeft ? start - delta : start + delta;
@@ -434,26 +434,31 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle,
         delete page;
         return deleteRecord(fileHandle, recordDescriptor, nextRid);
     }
-   
-    // case 3: record to be deleted is in this page
+    // case 3: slot is valid, record-to-be-deleted is in this page
     short recordOffset = slot.offset;
     short lastSlotNum = page->header.slotCount - 1; 
-
     // if deleting the very last record, no need to shift anything
     // otherwise delete it, then shift every record after it towards left
     if (rid.slotNum < lastSlotNum) {
-
         // get the size of the rest records first
-        int restSize = 0;
-        
-    
-        shiftBytes((char*)page + recordOffset, );
+        int restSize = page->header.freeSpaceOffset - slot.offset - slot.length;  
+        // shift the rest records left by slot.length
+        shiftBytes((char*)page + recordOffset, restSize, slot.length, true);
+        page->header.freeSpace += slot.length;
+        page->header.freeSpaceOffset -= slot.length;
         if (DEBUG) {
-            printf("shift the rest records to left done\n");
+            printf("delete the record from this page done\n");
         }
     }
     // set slot.offset to -1 to indicate that it's deleted
     slot.offset = -1;
+    writeSlotToPage(page, rid.slotNum, slot);
+    if(fileHandle.writePage(rid.pageNum, page) < 0) {
+        if (DEBUG) {
+            printf("failed to write page into file\n");
+        }
+        return -1;
+    }
     delete page; 
     return -1;
 }
@@ -461,7 +466,6 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle,
 RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, 
         const vector<Attribute> &recordDescriptor, 
         const void *data, const RID &rid) {
-
     return -1;
 }
 
@@ -471,7 +475,6 @@ RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle,
     
     void* record = malloc(PAGE_SIZE);    
     memset(record, 0, PAGE_SIZE);
-
     // read record out 
     if (readRecord(fileHandle, recordDescriptor, rid, record) < 0) {
         if (DEBUG) {
@@ -482,7 +485,6 @@ RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle,
     if (DEBUG) {
         printf("read record out done\n");
     }
-
     // find the index of the target attribute
     int attrIndex = 0;
     for (; strcmp(recordDescriptor[attrIndex].name.c_str(), 

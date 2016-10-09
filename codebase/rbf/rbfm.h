@@ -109,7 +109,7 @@ public:
     // ==== end of project 1 ===
 
     // ==== project 2 ===
-
+    void shiftBytes(char *start, int length, int delta, bool shiftLeft);
 
 
     // ==== project 2 ===

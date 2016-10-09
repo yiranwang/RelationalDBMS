@@ -22,7 +22,7 @@ typedef struct
     unsigned pageNumber;        // page number
     short slotCount;            // number of slots on this page
     short freeSpace;            // size of free space
-    short offset;               // starting address of free space
+    short freeSpaceOffset;      // starting address of free space
 
     char misc[86];
 
