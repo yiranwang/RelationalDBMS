@@ -6,7 +6,6 @@ typedef int RC;
 typedef char byte;
 
 #define DEBUG 0
-
 #define PAGE_SIZE 4096
 #define HEADER_SIZE 96
 #define DATA_SIZE 4000
@@ -15,7 +14,6 @@ typedef char byte;
 #include <climits>
 using namespace std;
 
-
 // ========= Start of self defined structures ==========
 typedef struct
 {
@@ -23,9 +21,7 @@ typedef struct
     short slotCount;            // number of slots on this page
     short freeSpace;            // size of free space
     short freeSpaceOffset;      // starting address of free space
-
     char misc[86];
-
 } PageHeader;
 
 typedef struct
@@ -56,7 +52,6 @@ typedef struct
 
 // =========== End of self defined structures ========
 
-
 class FileHandle;
 
 class PagedFileManager
@@ -76,7 +71,6 @@ protected:
 private:
     static PagedFileManager *_pf_manager;
 };
-
 
 class FileHandle
 {

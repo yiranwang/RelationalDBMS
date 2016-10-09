@@ -173,18 +173,24 @@ RC RecordBasedFileManager::insertRecordToPage(Page *page, const short offset,
 
 RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, 
         const vector<Attribute> &recordDescriptor, const void *data, RID &rid) {
-    short offset = -1;  // location on the page to insert the record
+    short insetOffset = -1;  // location on the page to insert the record
     short recordSize = -1;
     char *tmpRecord = (char*)malloc(PAGE_SIZE);
     // get tmpRecord, recordSize
-    composeRecord(recordDescriptor, data, tmpRecord, recordSize);
+    if (composeRecord(recordDescriptor, data, tmpRecord, recordSize) < 0) {
+        if (DEBUG) {
+            return -1;
+        }
+        delete tmpRecord;
+        return -1;
+    }
     if(DEBUG) {
         printf("compose done: size=%d\n", recordSize);
     }
     // get rid, offset
-    findInsertLocation(fileHandle, recordSize, rid, offset);
+    findInsertLocation(fileHandle, recordSize, rid, insetOffset);
     if(DEBUG) {
-        printf("find location done: offset=%d\n", offset);
+        printf("find location done: offset=%d\n", insertOffset);
     }
     // read out the destination page
     Page *page = new Page;
@@ -197,7 +203,7 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle,
         printf("page read out done: pageNum=%d\n", rid.pageNum);
     }
     // write record onto page
-    if (insertRecordToPage(page, offset, tmpRecord, recordSize)) {
+    if (insertRecordToPage(page, insertOffset, tmpRecord, recordSize)) {
         if (DEBUG) {
             printf("failed to write record to page\n");
         }
@@ -206,7 +212,7 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle,
         printf("insert record to page done\n");
     }
     // write slot onto page
-    Slot slot = {.offset = offset, .length = recordSize}; 
+    Slot slot = {.offset = insertOffset, .length = recordSize}; 
     if (writeSlotToPage(page, rid.slotNum, slot) < 0) {
         if(DEBUG) {
             printf("failed to write slot to page\n");
@@ -384,19 +390,22 @@ RC RecordBasedFileManager::getVarCharData(int offset, const void* data,
 //  ========== start of project 2 methods ============
 
 /*  Shift [start, start + length - 1] by delta bytes
- *  shiftLeft: true = left, false = right
+ *  delta > 0: shift right, delta < 0: shift left
+ *  delta == 0: no shift
  */
-void RecordBasedFileManager::shiftBytes(char *start, int length, 
-        int delta, bool shiftLeft) {
+void RecordBasedFileManager::shiftBytes(char *start, int length, int delta) {
+    if (delta == 0 || length == 0) {
+        return;
+    }
     // starting address of shifted piece 
-    char* dest = shiftLeft ? start - delta : start + delta;
-    if (shiftLeft) {
-        // copy in order: 0, 1, 2, ..., n-1
+    char* dest = start + delta;
+    // shift left: copy 0, 1, 2, ..., n-1
+    if (delta < 0) {
         for (int i = 0; i < length; i++) {
             dest[i] = start[i];
         }
     } 
-    // copy in reverse order: n-1, n-2, ..., 2, 1, 0
+    // shift right: copy n-1, n-2, ..., 2, 1, 0
     else {
         for (int i = length - 1; i >= 0; i--) {
             dest[i] = start[i];
@@ -435,23 +444,25 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle,
         return deleteRecord(fileHandle, recordDescriptor, nextRid);
     }
     // case 3: slot is valid, record-to-be-deleted is in this page
-    short recordOffset = slot.offset;
     short lastSlotNum = page->header.slotCount - 1; 
     // if deleting the very last record, no need to shift anything
-    // otherwise delete it, then shift every record after it towards left
+    // otherwise shift every following record to the left
     if (rid.slotNum < lastSlotNum) {
         // get the size of the rest records first
         int restSize = page->header.freeSpaceOffset - slot.offset - slot.length;  
-        // shift the rest records left by slot.length
-        shiftBytes((char*)page + recordOffset, restSize, slot.length, true);
-        page->header.freeSpace += slot.length;
-        page->header.freeSpaceOffset -= slot.length;
+        // shift the rest records to the LEFT by slot.length
+        shiftBytes((char*)page + slot.offset + slot.length, 
+                restSize, 0 - slot.length);
         if (DEBUG) {
             printf("delete the record from this page done\n");
         }
     }
+    // adjust freeSpace and freeSpaceOffset
+    page->header.freeSpace += slot.length;
+    page->header.freeSpaceOffset -= slot.length;
     // set slot.offset to -1 to indicate that it's deleted
     slot.offset = -1;
+    // write changes of the page to file
     writeSlotToPage(page, rid.slotNum, slot);
     if(fileHandle.writePage(rid.pageNum, page) < 0) {
         if (DEBUG) {
@@ -460,13 +471,96 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle,
         return -1;
     }
     delete page; 
-    return -1;
+    return 0;
 }
 
 RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, 
         const vector<Attribute> &recordDescriptor, 
         const void *data, const RID &rid) {
-    return -1;
+    // read the page
+    Page *page = new Page;
+    fileHandle.readPage(rid.pageNum, page);
+    if(DEBUG) {
+        printf("read page from file done\n");
+    } 
+    // read slot
+    Slot slot = {};
+    readSlotFromPage(page, rid.slotNum, slot);
+    if(DEBUG) {
+        printf("read slot done\n");                                                                
+    }
+    // check if a record is inside the current page                                                 
+    // case 1: record is deleted already
+    if (slot.offset < 0) {                                                                          
+        delete page;
+        if(DEBUG) {
+            printf("The record to be updated has been deleted!\n");                              
+        }
+        return -1;
+    }
+    // case 2: record is redirected to another page                                                 
+    // because after being updated, the current page cannot hold it                                 
+    else if (slot.length < 0) {
+        RID nextRid = *(RID*)((char*)page + slot.offset);                                           
+        delete page;
+        return updateRecord(fileHandle, recordDescriptor, data, nextRid);
+    }
+    // case 3: slot is valid, record-to-be-deleted is in this page
+    // first compose the updated inner record and get its size
+    short updatedRecordSize = -1;
+    char *updatedInnerRecord = (char*)malloc(PAGE_SIZE);
+    if (composeRecord(recordDescriptor, data, updatedInnerRecord, 
+                updatedRecordSize) < 0) {
+        if (DEBUG) {
+            printf("failed to compose record\n");
+        }
+        delete page;
+        return -1;
+    }
+    // find the record size change and the rest records' size:
+    int delta = (int)(updatedRecordSize - slot.length); 
+    int restSize = page->header.freeSpaceOffset - slot.offset - slot.length;  
+    // case 3.1: the page has enough space to hold the updated record
+    // store the updated record at the original position and adjust the rest
+    if (page->header.freeSpace >= delta) {
+        shiftBytes((char*)page + slot.offset + slot.length, restSize, delta);  
+        memcpy((char*)page + slot.offset, updatedInnerRecord, 
+                updatedRecordSize); 
+        page->header.freeSpace -= delta;
+        page->header.freeSpaceOffset += delta;
+    }
+    // case 3.2: the page doesn't have enough space to hold the updated record
+    // replace the record on this page with an RID of the target page
+    // store the updated record on the target page
+    // updatedRecord object is not used afterwards
+    else {
+        // replace record with RID
+        // shift rest records to the LEFT by slot.length - sizeof(RID)
+        shiftBytes((char*)page + slot.offset + slot.length,
+                restSize, sizeof(RID) - slot.length);
+        // insert the update record and get targetRid
+        RID targetRid = {};
+        if (insertRecord(fileHandle, recordDescriptor, data, targetRid) < 0) {
+            if (DEBUG) {
+                printf("failed to insert record\n");
+            }
+            delete page;
+            free(updatedRecord);
+            return -1;
+        }
+        // fill the RID of target page on this page and set slot.length = -1
+        RID *pointingRid = (RID*)((char*)page + slot.offset);
+        pointingRid->pageNum = targetRid.pageNum;
+        pointingRid->slotNum = targetRid.slotNum;
+        slot.length = -1;
+    } 
+
+    // make changes persistent and free memory
+    writeSlotToPage(page, rid.slotNum, slot);
+    fileHandle.writePage(page, rid.pageNum);
+    delete page;
+    free(updatedInnerRecord);
+    return 0;
 }
 
 RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, 
