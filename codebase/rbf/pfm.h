@@ -18,10 +18,11 @@ using namespace std;
 typedef struct
 {
     unsigned pageNumber;        // page number
+    short recordCount;          // number of records on this page 
     short slotCount;            // number of slots on this page
     short freeSpace;            // size of free space
     short freeSpaceOffset;      // starting address of free space
-    char misc[86];
+    char misc[84];
 } PageHeader;
 
 typedef struct
