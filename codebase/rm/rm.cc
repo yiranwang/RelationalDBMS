@@ -7,9 +7,9 @@ void createTableRecordDescriptor(vector<Attribute> &recordDescriptor);
 
 void createColumnRecordDescriptor(vector<Attribute> &recordDescriptor);
 
-void prepareTableRecord(vector<Attribute> &recordDescriptor);
+void prepareTableRecord(unsigned char *nullIndicator, const int tableId, const string &tableName, const string &fileName, void *data, int &recordSize);
 
-void prepareColumnRecord(vector<Attribute> &recordDescriptor);
+void prepareColumnRecord(unsigned char *nullIndicator, const int tableId, const string &columnName, const AttrType columnType , const int columnLength, const int position, void *data, int &recordSize);
 
 
 RelationManager* RelationManager::_rm = 0;
@@ -53,10 +53,64 @@ RC RelationManager::createCatalog()
 	//insert records of table "Tables", "Columns" to "Table"
 	int tableRecordSize = 0;
 	prepareTableRecord(nullIndicator, 1, "Tables", "Tables", tableData, tableRecordSize);
-	rbfm->insertRecord(FileHandle, tableRecordDescriptor, tableData, tableRid);
+	rbfm->insertRecord(tableFileHandle, tableRecordDescriptor, tableData, tableRid);
 
+	free(tableData);
 
-    return -1;
+	tableData = malloc(PAGE_SIZE);
+
+	prepareTableRecord(nullIndicator, 2, "Columns", "Columns", tableData, tableRecordSize);
+	rbfm->insertRecord(tableFileHandle, tableRecordDescriptor, tableData, tableRid);
+	rbfm->closeFile(tableFileHandle);
+
+	free(tableData);
+	free(nullIndicator);
+
+	//create "table-id", "table-name", "file-name"... record desciptor in catalog column
+	void *columnData = malloc(PAGE_SIZE);
+	FileHandle columnFileHandle;
+	RID columnRid;
+	int columnRecordSize = 0;
+
+	unsigned char *nullIndicator2 = (unsigned char *)malloc(PAGE_SIZE);
+	memset(nullIndicator2, 0, sizeof(char));
+
+	vector<Attribute> columnRecordDescriptor;
+	createColumnRecordDescriptor(columnRecordDescriptor);
+
+	rbfm->createFile("Columns");
+	rbfm->openFile("Columns", columnFileHandle);
+
+	prepareColumnRecord(nullIndicator2, nullIndicator2, 1, "table-id", TypeInt. 4, 1, columnData, columnRecordSize);
+	rbfm->insertRecord(columnFileHandle, columnRecordDescriptor, columnData, columnRid);
+
+	prepareColumnRecord(nullIndicator2, nullIndicator2, 1, "table-name", TypeVarChar. 50, 2, columnData, columnRecordSize);
+	rbfm->insertRecord(columnFileHandle, columnRecordDescriptor, columnData, columnRid);
+
+	prepareColumnRecord(nullIndicator2, nullIndicator2, 1, "file-name", TypeVarChar. 50, 3, columnData, columnRecordSize);
+	rbfm->insertRecord(columnFileHandle, columnRecordDescriptor, columnData, columnRid);
+
+	prepareColumnRecord(nullIndicator2, nullIndicator2, 2, "table-id", TypeInt. 4, 1, columnData, columnRecordSize);
+	rbfm->insertRecord(columnFileHandle, columnRecordDescriptor, columnData, columnRid);
+
+	prepareColumnRecord(nullIndicator2, nullIndicator2, 2, "column-name", TypeVarChar. 50, 2, columnData, columnRecordSize);
+	rbfm->insertRecord(columnFileHandle, columnRecordDescriptor, columnData, columnRid);
+
+	prepareColumnRecord(nullIndicator2, nullIndicator2, 2, "column-type", TypeInt. 4, 3, columnData, columnRecordSize);
+	rbfm->insertRecord(columnFileHandle, columnRecordDescriptor, columnData, columnRid);
+
+	prepareColumnRecord(nullIndicator2, nullIndicator2, 2, "column-length", TypeInt. 4, 4, columnData, columnRecordSize);
+	rbfm->insertRecord(columnFileHandle, columnRecordDescriptor, columnData, columnRid);
+
+	prepareColumnRecord(nullIndicator2, nullIndicator2, 2, "column-position", TypeInt. 4, 5, columnData, columnRecordSize);
+	rbfm->insertRecord(columnFileHandle, columnRecordDescriptor, columnData, columnRid);
+
+	rbfm->closeFile(columnFileHandle);
+
+	free(nullIndicator2);
+	free(columnData);
+
+    return 0;
 }
 
 RC RelationManager::deleteCatalog()
@@ -185,26 +239,53 @@ void createColumnRecordDescriptor(vector<Attribute> &recordDescriptor) {
 
 void prepareTableRecord(unsigned char *nullIndicator, const int tableId, const string &tableName, const string &fileName, void *data, int &recordSize) {
 	int tableNameLength = tableName.size();
-
 	int fileNameLength = fileName.size();
 
 	int offset = 0;
 
 	memcpy(data, nullIndicator, sizeof(char));
-
 	offset += sizeof(char);
 
 	*((int*)((char*)data + offset)) = tableId;
-
 	offset += sizeof(int);
 
-	memcpy((char*)data + offset, tableName.c_str(), tableNameLength);
+	*((int*)((char*)data + offset)) = tableNameLength;
+    offset += sizeof(int);
+    
+    memcpy((char*)data + offset, tableName.c_str(), tableNameLength);
+    offset += tableNameLength;
+    
+    *((int*)((char*)data + offset)) = fileNameLength;
+    offset += sizeof(int);
+    
+    memcpy((char*)data + offset, fileName.c_str(), fileNameLength);
+    offset += fileNameLength;
 
-	offset += tableNameLength;
+	recordSize = offset;
+}
 
-	memcpy((char*)data + offset, fileName.c_str(), fileNameLength);
+void prepareColumnRecord(unsigned char *nullIndicator, const int tableId, const string &columnName, const AttrType columnType , const int columnLength, const int position, void *data, int &recordSize) {
+	int columnNameLength = columnName.size();
 
-	offset += fileNameLength;
+	int offset = 0;
+
+	memcpy(data, nullIndicator, sizeof(char));
+	offset += sizeof(char);
+
+	*((int*)((char*)data + offset)) = tableId;
+	offset += sizeof(int);
+
+	memcpy((char*)data + offset, tableName.c_str(), columnNameLength);
+	offset += columnNameLength;
+
+	*((AttrType*)((char*)data + offset)) = columnType;
+	offset += sizeof(AttrType);
+
+	*((int*)((char*)data + offset)) = columnLength;
+	offset += sizeof(int);
+
+	*((int*)((char*)data + offset)) = position;
+	offset += sizeof(int);
 
 	recordSize = offset;
 }
