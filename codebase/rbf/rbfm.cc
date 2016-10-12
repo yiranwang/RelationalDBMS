@@ -103,9 +103,9 @@ RC RecordBasedFileManager::composeRecord(
 }
 
 // return an initialized page 
-Page RecordBasedFileManager::initializePage(const unsigned pageNum) {
-    Page tmpPage = {};
-    tmpPage.header = {.pageNumber = pageNum, .recordCount = 0, .slotCount = 0, 
+Page* RecordBasedFileManager::initializePage(const unsigned pageNum) {
+    Page *tmpPage = new Page;
+    tmpPage->header = {.pageNumber = pageNum, .recordCount = 0, .slotCount = 0, 
         .freeSpace = DATA_SIZE, .freeSpaceOffset = HEADER_SIZE};
     return tmpPage;    
 }
@@ -132,9 +132,9 @@ RC RecordBasedFileManager::findInsertLocation(FileHandle &fileHandle,
     // case 1: empty file or no page can fit this record, append a new page
     // store this record as the 1st record on this page 
     if  (targetPageNum < 0 || targetPageNum == 2 * totalPage - 1) {
-        Page newPage = initializePage(totalPage);
-        curHeader = newPage.header;
-        fileHandle.appendPage(&newPage);
+        Page *newPage = initializePage(totalPage);
+        curHeader = newPage->header;
+        fileHandle.appendPage(newPage);
         rid.pageNum = totalPage;
         rid.slotNum = 0;
     }

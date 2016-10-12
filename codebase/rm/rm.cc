@@ -3,13 +3,20 @@
 #include <stdlib.h>
 
 
+
+
+void RelationManage::createColumnRecordDescriptor(
+        vector<Attribute> &recordDescriptor);
+
+
+void RelationManager::prepareColumnRecord(vector<Attribute> &recordDescriptor);
+
+
 RelationManager* RelationManager::_rm = 0;
 
-RelationManager* RelationManager::instance()
-{
+RelationManager* RelationManager::instance(){
     if(!_rm)
         _rm = new RelationManager();
-
     return _rm;
 }
 
@@ -22,13 +29,151 @@ RelationManager::RelationManager()
 	createColumnRecordDescriptor(columnRecordDescriptor);
 }
 
-RelationManager::~RelationManager()
-{
+RelationManager::~RelationManager(){
 }
 
-RC RelationManager::createCatalog()
-{
+void RelationManager::prepareApiTableRecord(const int tableId, 
+        const string &tableName, const string &fileName, void *data) {
+   
+    // data is memset to 0
+    // null indicator only needs 1 byte, already set to 0
+    int offset = 1;
+    
+    memcpy((char*)data + offset, &tableId, sizeof(int));
+    offset += sizeof(int);
 
+    memcpy((char*)data + offset, tableName.c_str(), tableName.length());
+    offset += tableName.length();
+
+    memcpy((char*)data + offset, fileName.c_str() fileName.length()); 
+}
+
+void RelationManager::prepareApiColumnRecord(const int tableId, 
+        const string &columnName, const AttrType type, 
+        const int columnLength, const int position, void *data) {
+
+    int offset = 1;         // null indicator is 1 byte, already set to 0
+    
+    memcpy((char*)data + offset, &tableId, sizeof(int));
+    offset += sizeof(int);
+    
+    memcpy((char*)data + offset, columnName.c_str(), columnName.length());
+    offset += columnName.length();
+
+    memcpy((char*)data + offset, &type, sizeof(AttrType));
+    offset += sizeof(AttrType);
+
+    memcpy((char*)data + offset, &columnLength, sizeof(int));
+    offset += sizeof(int);
+
+    memcpy((char*)data + offset, &position, sizeof(int));
+}
+
+
+
+RC RelationManager::createCatalog(){
+	//create column record descriptor -> prepare column record -> insert
+	FileHandle fileHandle;
+
+	//create and open table file
+    //prepare table record -> insert
+	if (rbfm->createFile(TABLES_FILE_NAME) < 0) {
+        return -1;
+    }
+    if (rbfm->openFile(TABLES_FILE_NAME, fileHandle) < 0) {
+        return -1;
+    }
+	void *tmpData = malloc(PAGE_SIZE);
+    RID dummyRid;
+    // insert table records
+    memset(tmpData, 0, PAGE_SIZE);
+    prepareApiTableRecord(1, TABLES_TABLE_NAME, TABLES_FILE_NAME, tmpData);
+    if (rbfm->insetRecord(fileHandle, tableRecordDescriptor, 
+                tmpData, dummyRid) < 0) {
+        return -1;
+    }
+    memset(tmpData, 0, PAGE_SIZE);
+    prepareApiTableRecord(2, COLUMNS_TABLE_NAME, COLUMNS_FILE_NAME, tmpData);
+    if (rbfm->insetRecord(fileHandle, columnsRecordDescriptor, 
+                tmpData, tableRid) < 0) {
+        return -1;
+    }
+    if (rbfm->closeFile(fileHandle) < 0) {
+        return -1;
+    }
+  
+
+	//create and open column file
+    //prepare column record -> insert
+	if (rbfm->createFile(COLUMNS_FILE_NAME) < 0) {
+        return -1;
+    }
+    if (rbfm->openFile(COLUMNS_FILE_NAME, fileHandle) < 0) {
+        return -1;
+    }
+    
+    memset(tmpData, 0, PAGE_SIZE);
+    prepareApiColumnRecord(1, "table-id", TypeInt, 4, 1, tmpData);
+    if (rbfm->insetRecord(fileHandle, columnRecordDescriptor, 
+                tmpData, dummyRid) < 0) {
+        return -1;
+    }
+
+    memset(tmpData, 0, PAGE_SIZE);
+    prepareApiColumnRecord(1, "table-name", TypeVarChar, 50, 2, tmpData);
+    if (rbfm->insetRecord(fileHandle, columnRecordDescriptor, 
+                tmpData, dummyRid) < 0) {
+        return -1;
+    }
+
+    memset(tmpData, 0, PAGE_SIZE);
+    prepareApiColumnRecord(1, "file-name", TypeVarChar, 50, 3, tmpData);
+    if (rbfm->insetRecord(fileHandle, columnRecordDescriptor, 
+                tmpData, dummyRid) < 0) {
+        return -1;
+    }
+    
+    memset(tmpData, 0, PAGE_SIZE);
+    prepareApiColumnRecord(2, "table-id", TypeInt, 4, 1, tmpData);
+    if (rbfm->insetRecord(fileHandle, columnRecordDescriptor, 
+                tmpData, dummyRid) < 0) {
+        return -1;
+    }
+
+    memset(tmpData, 0, PAGE_SIZE);
+    prepareApiColumnRecord(2, "column-name", TypeVarChar, 50, 2, tmpData);
+    if (rbfm->insetRecord(fileHandle, columnRecordDescriptor, 
+                tmpData, dummyRid) < 0) {
+        return -1;
+    }
+
+    memset(tmpData, 0, PAGE_SIZE);
+    prepareApiColumnRecord(2, "column-type", TypeInt, 4, 3, tmpData);
+    if (rbfm->insetRecord(fileHandle, columnRecordDescriptor, 
+                tmpData, dummyRid) < 0) {
+        return -1;
+    }
+        
+    memset(tmpData, 0, PAGE_SIZE);
+    prepareApiColumnRecord(2, "column-length", TypeInt, 4, 4, tmpData);
+    if (rbfm->insetRecord(fileHandle, columnRecordDescriptor, 
+                tmpData, dummyRid) < 0) {
+        return -1;
+    }
+
+    memset(tmpData, 0, PAGE_SIZE);
+    prepareApiColumnRecord(2, "column-position", TypeInt, 4, 5, tmpData);
+    if (rbfm->insetRecord(fileHandle, columnRecordDescriptor, 
+                tmpData, dummyRid) < 0) {
+        return -1;
+    }
+
+    if (rbfm->closeFile(fileHandle) < 0) {
+        return -1;
+    }
+    
+    
+    free(tmpData);
     return 0;
 }
 

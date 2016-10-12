@@ -85,13 +85,15 @@ class RecordBasedFileManager
 public:
     static RecordBasedFileManager* instance();
 
+    //
+    
     // ====== start of self defined methods =======
     // ==== start of project 1 ===
     RC getNullIndicatorSize(const int fieldCount); 
 
     RC composeRecord(const vector<Attribute> &recordDescriptor, const void *data, void *tmpRecord, short &size);
 
-    Page initializePage(const unsigned pageNum);
+    Page *initializePage(const unsigned pageNum);
 
     RC findInsertLocation(FileHandle &fileHandle, const short recordSize, RID &rid, short &offset);
 
