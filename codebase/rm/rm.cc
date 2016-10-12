@@ -2,10 +2,6 @@
 #include "rm.h"
 #include <stdlib.h>
 
-void prepareTableRecord(unsigned char *nullIndicator, const int tableId, const string &tableName, const string &fileName, void *data, int &recordSize);
-
-void prepareColumnRecord(unsigned char *nullIndicator, const int tableId, const string &columnName, const AttrType columnType , const int columnLength, const int position, void *data, int &recordSize);
-
 
 RelationManager* RelationManager::_rm = 0;
 
@@ -176,55 +172,3 @@ void RelationManager::createColumnRecordDescriptor(vector<Attribute> &recordDesc
 	recordDescriptor.push_back(attr5);
 }
 
-void prepareTableRecord(unsigned char *nullIndicator, const int tableId, const string &tableName, const string &fileName, void *data, int &recordSize) {
-	int tableNameLength = tableName.size();
-	int fileNameLength = fileName.size();
-
-	int offset = 0;
-
-	memcpy(data, nullIndicator, sizeof(char));
-	offset += sizeof(char);
-
-	*((int*)((char*)data + offset)) = tableId;
-	offset += sizeof(int);
-
-	*((int*)((char*)data + offset)) = tableNameLength;
-    offset += sizeof(int);
-    
-    memcpy((char*)data + offset, tableName.c_str(), tableNameLength);
-    offset += tableNameLength;
-    
-    *((int*)((char*)data + offset)) = fileNameLength;
-    offset += sizeof(int);
-    
-    memcpy((char*)data + offset, fileName.c_str(), fileNameLength);
-    offset += fileNameLength;
-
-	recordSize = offset;
-}
-
-void prepareColumnRecord(unsigned char *nullIndicator, const int tableId, const string &columnName, const AttrType columnType , const int columnLength, const int position, void *data, int &recordSize) {
-	int columnNameLength = columnName.size();
-
-	int offset = 0;
-
-	memcpy(data, nullIndicator, sizeof(char));
-	offset += sizeof(char);
-
-	*((int*)((char*)data + offset)) = tableId;
-	offset += sizeof(int);
-
-	memcpy((char*)data + offset, columnName.c_str(), columnNameLength);
-	offset += columnNameLength;
-
-	*((AttrType*)((char*)data + offset)) = columnType;
-	offset += sizeof(AttrType);
-
-	*((int*)((char*)data + offset)) = columnLength;
-	offset += sizeof(int);
-
-	*((int*)((char*)data + offset)) = position;
-	offset += sizeof(int);
-
-	recordSize = offset;
-}
