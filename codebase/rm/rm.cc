@@ -2,9 +2,6 @@
 #include "rm.h"
 #include <stdlib.h>
 
-
-
-
 void RelationManage::createColumnRecordDescriptor(
         vector<Attribute> &recordDescriptor);
 
