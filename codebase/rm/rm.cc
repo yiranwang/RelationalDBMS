@@ -2,13 +2,6 @@
 #include "rm.h"
 #include <stdlib.h>
 
-void RelationManage::createColumnRecordDescriptor(
-        vector<Attribute> &recordDescriptor);
-
-
-void RelationManager::prepareColumnRecord(vector<Attribute> &recordDescriptor);
-
-
 RelationManager* RelationManager::_rm = 0;
 
 RelationManager* RelationManager::instance(){
@@ -67,7 +60,6 @@ void RelationManager::prepareApiColumnRecord(const int tableId,
 }
 
 
-
 RC RelationManager::createCatalog(){
 	//create column record descriptor -> prepare column record -> insert
 	FileHandle fileHandle;
@@ -99,7 +91,6 @@ RC RelationManager::createCatalog(){
         return -1;
     }
   
-
 	//create and open column file
     //prepare column record -> insert
 	if (rbfm->createFile(COLUMNS_FILE_NAME) < 0) {
@@ -204,23 +195,23 @@ RC RelationManager::deleteTuple(const string &tableName, const RID &rid)
     return -1;
 }
 
-RC RelationManager::updateTuple(const string &tableName, const void *data, const RID &rid)
-{
+RC RelationManager::updateTuple(const string &tableName, const void *data, 
+        const RID &rid) {
     return -1;
 }
 
-RC RelationManager::readTuple(const string &tableName, const RID &rid, void *data)
-{
+RC RelationManager::readTuple(const string &tableName, const RID &rid, 
+        void *data) {
     return -1;
 }
 
-RC RelationManager::printTuple(const vector<Attribute> &attrs, const void *data)
-{
+RC RelationManager::printTuple(const vector<Attribute> &attrs, 
+        const void *data) {
 	return rbfm->printRecord(attrs, data);
 }
 
-RC RelationManager::readAttribute(const string &tableName, const RID &rid, const string &attributeName, void *data)
-{
+RC RelationManager::readAttribute(const string &tableName, const RID &rid, 
+        const string &attributeName, void *data) {
     FileHandle fileHandle;
     vector<Attribute> recordDescriptor;
 
@@ -229,7 +220,7 @@ RC RelationManager::readAttribute(const string &tableName, const RID &rid, const
     if (rc == 0) {
     	getAttributes(tableName, recordDescriptor);
 
-    	//is data returned contains only 1byte nullIndicator??
+    	//is data returned contains only 1 byte nullIndicator??
     	RC rc2 = rbfm->readAttribute(fileHandle, recordDescriptor, rid, attributeName, data);
 
     	rbfm->closeFile(fileHandle);
