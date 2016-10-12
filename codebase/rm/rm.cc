@@ -2,11 +2,6 @@
 #include "rm.h"
 #include <stdlib.h>
 
-
-void createTableRecordDescriptor(vector<Attribute> &recordDescriptor);
-
-void createColumnRecordDescriptor(vector<Attribute> &recordDescriptor);
-
 void prepareTableRecord(unsigned char *nullIndicator, const int tableId, const string &tableName, const string &fileName, void *data, int &recordSize);
 
 void prepareColumnRecord(unsigned char *nullIndicator, const int tableId, const string &columnName, const AttrType columnType , const int columnLength, const int position, void *data, int &recordSize);
@@ -24,6 +19,11 @@ RelationManager* RelationManager::instance()
 
 RelationManager::RelationManager()
 {
+	rbfm = RecordBasedFileManager::instance();
+
+	createTableRecordDescriptor(tableRecordDescriptor);
+
+	createColumnRecordDescriptor(columnRecordDescriptor);
 }
 
 RelationManager::~RelationManager()
@@ -45,7 +45,7 @@ RC RelationManager::createCatalog()
 	vector<Attribute> tableRecordDescriptor;
 
 	//create "table-id", "table-name", "file-name" record desciptor in catalog table
-	createTableRecordDescriptor(tableRecordDescriptor);
+	//createTableRecordDescriptor(tableRecordDescriptor);
 
 	rbfm->createFile("Tables");
 	rbfm->openFile("Tables", tableFileHandle);
@@ -76,33 +76,33 @@ RC RelationManager::createCatalog()
 	memset(nullIndicator2, 0, sizeof(char));
 
 	vector<Attribute> columnRecordDescriptor;
-	createColumnRecordDescriptor(columnRecordDescriptor);
+	//createColumnRecordDescriptor(columnRecordDescriptor);
 
 	rbfm->createFile("Columns");
 	rbfm->openFile("Columns", columnFileHandle);
 
-	prepareColumnRecord(nullIndicator2, nullIndicator2, 1, "table-id", TypeInt. 4, 1, columnData, columnRecordSize);
+	prepareColumnRecord(nullIndicator2, 1, "table-id", TypeInt, 4, 1, columnData, columnRecordSize);
 	rbfm->insertRecord(columnFileHandle, columnRecordDescriptor, columnData, columnRid);
 
-	prepareColumnRecord(nullIndicator2, nullIndicator2, 1, "table-name", TypeVarChar. 50, 2, columnData, columnRecordSize);
+	prepareColumnRecord(nullIndicator2, 1, "table-name", TypeVarChar, 50, 2, columnData, columnRecordSize);
 	rbfm->insertRecord(columnFileHandle, columnRecordDescriptor, columnData, columnRid);
 
-	prepareColumnRecord(nullIndicator2, nullIndicator2, 1, "file-name", TypeVarChar. 50, 3, columnData, columnRecordSize);
+	prepareColumnRecord(nullIndicator2, 1, "file-name", TypeVarChar, 50, 3, columnData, columnRecordSize);
 	rbfm->insertRecord(columnFileHandle, columnRecordDescriptor, columnData, columnRid);
 
-	prepareColumnRecord(nullIndicator2, nullIndicator2, 2, "table-id", TypeInt. 4, 1, columnData, columnRecordSize);
+	prepareColumnRecord(nullIndicator2, 2, "table-id", TypeInt, 4, 1, columnData, columnRecordSize);
 	rbfm->insertRecord(columnFileHandle, columnRecordDescriptor, columnData, columnRid);
 
-	prepareColumnRecord(nullIndicator2, nullIndicator2, 2, "column-name", TypeVarChar. 50, 2, columnData, columnRecordSize);
+	prepareColumnRecord(nullIndicator2, 2, "column-name", TypeVarChar, 50, 2, columnData, columnRecordSize);
 	rbfm->insertRecord(columnFileHandle, columnRecordDescriptor, columnData, columnRid);
 
-	prepareColumnRecord(nullIndicator2, nullIndicator2, 2, "column-type", TypeInt. 4, 3, columnData, columnRecordSize);
+	prepareColumnRecord(nullIndicator2, 2, "column-type", TypeInt, 4, 3, columnData, columnRecordSize);
 	rbfm->insertRecord(columnFileHandle, columnRecordDescriptor, columnData, columnRid);
 
-	prepareColumnRecord(nullIndicator2, nullIndicator2, 2, "column-length", TypeInt. 4, 4, columnData, columnRecordSize);
+	prepareColumnRecord(nullIndicator2, 2, "column-length", TypeInt, 4, 4, columnData, columnRecordSize);
 	rbfm->insertRecord(columnFileHandle, columnRecordDescriptor, columnData, columnRid);
 
-	prepareColumnRecord(nullIndicator2, nullIndicator2, 2, "column-position", TypeInt. 4, 5, columnData, columnRecordSize);
+	prepareColumnRecord(nullIndicator2, 2, "column-position", TypeInt, 4, 5, columnData, columnRecordSize);
 	rbfm->insertRecord(columnFileHandle, columnRecordDescriptor, columnData, columnRid);
 
 	rbfm->closeFile(columnFileHandle);
@@ -155,12 +155,28 @@ RC RelationManager::readTuple(const string &tableName, const RID &rid, void *dat
 
 RC RelationManager::printTuple(const vector<Attribute> &attrs, const void *data)
 {
-	return -1;
+	return rbfm->printRecord(attrs, data);
 }
 
 RC RelationManager::readAttribute(const string &tableName, const RID &rid, const string &attributeName, void *data)
 {
-    return -1;
+    FileHandle fileHandle;
+    vector<Attribute> recordDescriptor;
+
+    RC rc = rbfm->openFile(tableName, fileHandle);
+
+    if (rc == 0) {
+    	getAttributes(tableName, recordDescriptor);
+
+    	//is data returned contains only 1byte nullIndicator??
+    	RC rc2 = rbfm->readAttribute(fileHandle, recordDescriptor, rid, attributeName, data);
+
+    	rbfm->closeFile(fileHandle);
+    	return rc2;
+
+    }else {
+    	return -1;
+    }
 }
 
 RC RelationManager::scan(const string &tableName,
@@ -185,7 +201,7 @@ RC RelationManager::addAttribute(const string &tableName, const Attribute &attr)
     return -1;
 }
 
-void createTableRecordDescriptor(vector<Attribute> &recordDescriptor) {
+void RelationManager::createTableRecordDescriptor(vector<Attribute> &recordDescriptor) {
 	Attribute attr1;
 	attr1.name = "table-id";
 	attr1.type = TypeInt;
@@ -205,7 +221,7 @@ void createTableRecordDescriptor(vector<Attribute> &recordDescriptor) {
 	recordDescriptor.push_back(attr3);
 }
 
-void createColumnRecordDescriptor(vector<Attribute> &recordDescriptor) {
+void RelationManager::createColumnRecordDescriptor(vector<Attribute> &recordDescriptor) {
 	Attribute attr1;
 	attr1.name = "table-id";
 	attr1.type = TypeInt;
@@ -275,7 +291,7 @@ void prepareColumnRecord(unsigned char *nullIndicator, const int tableId, const 
 	*((int*)((char*)data + offset)) = tableId;
 	offset += sizeof(int);
 
-	memcpy((char*)data + offset, tableName.c_str(), columnNameLength);
+	memcpy((char*)data + offset, columnName.c_str(), columnNameLength);
 	offset += columnNameLength;
 
 	*((AttrType*)((char*)data + offset)) = columnType;

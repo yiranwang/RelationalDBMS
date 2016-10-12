@@ -29,6 +29,12 @@ class RelationManager
 public:
   static RelationManager* instance();
 
+  RecordBasedFileManager *rbfm;
+
+  vector<Attribute> tableRecordDescriptor;
+
+  vector<Attribute> columnRecordDescriptor;
+
   RC createCatalog();
 
   RC deleteCatalog();
@@ -75,6 +81,10 @@ protected:
 
 private:
   static RelationManager *_rm;
+
+  void createTableRecordDescriptor(vector<Attribute> &recordDescriptor);
+
+  void createColumnRecordDescriptor(vector<Attribute> &recordDescriptor);
 };
 
 #endif

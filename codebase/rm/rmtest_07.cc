@@ -15,7 +15,7 @@ RC TEST_RM_7(const string &tableName)
     RC rc = 0;
     for(int i = 0; i < numTuples; i++)
     {
-        int age = 10+i;
+        int age = 20+i;
         ages.insert(age);
     }
 

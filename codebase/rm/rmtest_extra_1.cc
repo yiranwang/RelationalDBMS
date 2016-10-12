@@ -30,7 +30,7 @@ RC RM_TEST_EXTRA_1(const string &tableName, const int nameLength, const string &
     rc = rm->readAttribute(tableName, rid, "Height", returnedData);
     assert(rc == success && "RelationManager::readAttribute() should not fail.");
 
-    if(memcmp((char *)returnedData+nullAttributesIndicatorActualSize, (char *)tuple+14+nullAttributesIndicatorActualSize, 4) != 0)
+    if(memcmp((char *)returnedData+nullAttributesIndicatorActualSize, (char *)tuple+22+nullAttributesIndicatorActualSize, 4) != 0)
     {
         cout << "RelationManager::readAttribute() failed." << endl;
         cout << "***** [FAIL] Extra Credit Test Case 1 Failed. *****"<<endl;
