@@ -5,10 +5,15 @@ all: librbf.a rbftest1 rbftest2 rbftest3 rbftest4 rbftest5 rbftest6 rbftest7 rbf
 # c file dependencies
 pfm.o: pfm.h
 rbfm.o: rbfm.h
+rbfm_aux.o: rbfm.h
+rbfm_scan.o: rbfm.h
 
 # lib file dependencies
 librbf.a: librbf.a(pfm.o)  # and possibly other .o files
 librbf.a: librbf.a(rbfm.o)
+librbf.a: librbf.a(rbfm_aux.o)
+librbf.a: librbf.a(rbfm_scan.o)
+
 
 rbftest1.o: pfm.h rbfm.h
 rbftest2.o: pfm.h rbfm.h

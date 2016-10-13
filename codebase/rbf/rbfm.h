@@ -84,8 +84,6 @@ class RecordBasedFileManager
 {
 public:
     static RecordBasedFileManager* instance();
-
-    //
     
     // ====== start of self defined methods =======
     // ==== start of project 1 ===
