@@ -34,13 +34,23 @@ class RelationManager
 public:
     static RelationManager* instance();
 
-  RecordBasedFileManager *rbfm;
+    RecordBasedFileManager *rbfm;
 
-  vector<Attribute> tableRecordDescriptor;
+    vector<Attribute> tableRecordDescriptor;
 
-  vector<Attribute> columnRecordDescriptor;
+    vector<Attribute> columnRecordDescriptor;
 
-  RC createCatalog();
+   
+    // ======= start of self defined functions =====
+    void prepareApiTableRecord(const int tableId, const string &tableName,
+            const string &fileName, void *data); 
+    void prepareApiColumnRecord(const int tableId, const string &columnName, 
+            const AttrType type, const int columnLength, const int position,
+            void *data);
+    
+    // ======= end of self defined functions =====
+    
+    RC createCatalog();
 
     RC deleteCatalog();
 

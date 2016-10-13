@@ -35,7 +35,7 @@ void RelationManager::prepareApiTableRecord(const int tableId,
     memcpy((char*)data + offset, tableName.c_str(), tableName.length());
     offset += tableName.length();
 
-    memcpy((char*)data + offset, fileName.c_str() fileName.length()); 
+    memcpy((char*)data + offset, fileName.c_str(), fileName.length()); 
 }
 
 void RelationManager::prepareApiColumnRecord(const int tableId, 
@@ -77,14 +77,14 @@ RC RelationManager::createCatalog(){
     // insert table records
     memset(tmpData, 0, PAGE_SIZE);
     prepareApiTableRecord(1, TABLES_TABLE_NAME, TABLES_FILE_NAME, tmpData);
-    if (rbfm->insetRecord(fileHandle, tableRecordDescriptor, 
+    if (rbfm->insertRecord(fileHandle, tableRecordDescriptor, 
                 tmpData, dummyRid) < 0) {
         return -1;
     }
     memset(tmpData, 0, PAGE_SIZE);
     prepareApiTableRecord(2, COLUMNS_TABLE_NAME, COLUMNS_FILE_NAME, tmpData);
-    if (rbfm->insetRecord(fileHandle, columnsRecordDescriptor, 
-                tmpData, tableRid) < 0) {
+    if (rbfm->insertRecord(fileHandle, columnRecordDescriptor, 
+                tmpData, dummyRid) < 0) {
         return -1;
     }
     if (rbfm->closeFile(fileHandle) < 0) {
@@ -92,7 +92,7 @@ RC RelationManager::createCatalog(){
     }
   
 	//create and open column file
-    //prepare column record -> insert
+    //prepare and insert column records
 	if (rbfm->createFile(COLUMNS_FILE_NAME) < 0) {
         return -1;
     }
@@ -102,56 +102,56 @@ RC RelationManager::createCatalog(){
     
     memset(tmpData, 0, PAGE_SIZE);
     prepareApiColumnRecord(1, "table-id", TypeInt, 4, 1, tmpData);
-    if (rbfm->insetRecord(fileHandle, columnRecordDescriptor, 
+    if (rbfm->insertRecord(fileHandle, columnRecordDescriptor, 
                 tmpData, dummyRid) < 0) {
         return -1;
     }
 
     memset(tmpData, 0, PAGE_SIZE);
     prepareApiColumnRecord(1, "table-name", TypeVarChar, 50, 2, tmpData);
-    if (rbfm->insetRecord(fileHandle, columnRecordDescriptor, 
+    if (rbfm->insertRecord(fileHandle, columnRecordDescriptor, 
                 tmpData, dummyRid) < 0) {
         return -1;
     }
 
     memset(tmpData, 0, PAGE_SIZE);
     prepareApiColumnRecord(1, "file-name", TypeVarChar, 50, 3, tmpData);
-    if (rbfm->insetRecord(fileHandle, columnRecordDescriptor, 
+    if (rbfm->insertRecord(fileHandle, columnRecordDescriptor, 
                 tmpData, dummyRid) < 0) {
         return -1;
     }
     
     memset(tmpData, 0, PAGE_SIZE);
     prepareApiColumnRecord(2, "table-id", TypeInt, 4, 1, tmpData);
-    if (rbfm->insetRecord(fileHandle, columnRecordDescriptor, 
+    if (rbfm->insertRecord(fileHandle, columnRecordDescriptor, 
                 tmpData, dummyRid) < 0) {
         return -1;
     }
 
     memset(tmpData, 0, PAGE_SIZE);
     prepareApiColumnRecord(2, "column-name", TypeVarChar, 50, 2, tmpData);
-    if (rbfm->insetRecord(fileHandle, columnRecordDescriptor, 
+    if (rbfm->insertRecord(fileHandle, columnRecordDescriptor, 
                 tmpData, dummyRid) < 0) {
         return -1;
     }
 
     memset(tmpData, 0, PAGE_SIZE);
     prepareApiColumnRecord(2, "column-type", TypeInt, 4, 3, tmpData);
-    if (rbfm->insetRecord(fileHandle, columnRecordDescriptor, 
+    if (rbfm->insertRecord(fileHandle, columnRecordDescriptor, 
                 tmpData, dummyRid) < 0) {
         return -1;
     }
         
     memset(tmpData, 0, PAGE_SIZE);
     prepareApiColumnRecord(2, "column-length", TypeInt, 4, 4, tmpData);
-    if (rbfm->insetRecord(fileHandle, columnRecordDescriptor, 
+    if (rbfm->insertRecord(fileHandle, columnRecordDescriptor, 
                 tmpData, dummyRid) < 0) {
         return -1;
     }
 
     memset(tmpData, 0, PAGE_SIZE);
     prepareApiColumnRecord(2, "column-position", TypeInt, 4, 5, tmpData);
-    if (rbfm->insetRecord(fileHandle, columnRecordDescriptor, 
+    if (rbfm->insertRecord(fileHandle, columnRecordDescriptor, 
                 tmpData, dummyRid) < 0) {
         return -1;
     }
@@ -167,7 +167,13 @@ RC RelationManager::createCatalog(){
 
 RC RelationManager::deleteCatalog()
 {
-    return -1;
+    if(rbfm->destroyFile(TABLES_FILE_NAME) < 0) {
+        return -1;
+    }       
+    if(rbfm->destroyFile(COLUMNS_FILE_NAME) < 0) {
+        return -1;
+    }
+    return 0;
 }
 
 RC RelationManager::createTable(const string &tableName, const vector<Attribute> &attrs)
