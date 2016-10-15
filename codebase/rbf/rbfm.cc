@@ -71,22 +71,14 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
         printf("page read out done: pageNum=%d\n", rid.pageNum);
     }
     // write record onto page
-    if (insertRecordToPage(page, insertOffset, tmpRecord, recordSize)) {
-        if (DEBUG) {
-            printf("failed to write record to page\n");
-        }
-    }
+    insertRecordToPage(page, insertOffset, tmpRecord, recordSize);
+    
     if(DEBUG) {
         printf("insert record to page done\n");
     }
     // write slot onto page
     Slot slot = {.offset = insertOffset, .length = recordSize}; 
-    if (writeSlotToPage(page, rid.slotNum, slot) < 0) {
-        if(DEBUG) {
-            printf("failed to write slot to page\n");
-        }
-        return -1;
-    }        
+    writeSlotToPage(page, rid.slotNum, slot); 
     if(DEBUG) {
         printf("write slot done\n");
     }

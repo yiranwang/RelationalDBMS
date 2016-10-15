@@ -42,8 +42,17 @@ struct Attribute {
 };
 
 
+// Comparison Operator (NOT needed for part 1 of the project)
+typedef enum { EQ_OP = 0, // no condition// = 
+           LT_OP,      // <
+           LE_OP,      // <=
+           GT_OP,      // >
+           GE_OP,      // >=
+           NE_OP,      // !=
+           NO_OP       // no condition
+} CompOp;
 
-
+class RBFM_ScanIterator;
 
 
 class RecordBasedFileManager {
@@ -78,9 +87,9 @@ public:
     // ==== project 2 ===
     void shiftBytes(char *start, int length, int delta);
 
-
+    RC composeApiTuple(const vector<Attribute> &recordDescriptor, vector<int> &projectedDescriptor, 
+        void *innerRecord, void *tuple, short &size);
     // ==== project 2 ===
-
 
 
     // ====== end of self defined methods ========
@@ -118,6 +127,7 @@ RC readRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor,
 //        age: NULL  height: 7.5  salary: 7500)
 RC printRecord(const vector<Attribute> &recordDescriptor, const void *data);
 
+
 /******************************************************************************************************************************************************************
 IMPORTANT, PLEASE READ: All methods below this comment (other than the constructor and destructor) are NOT required to be implemented for the part 1 of the project
 ******************************************************************************************************************************************************************/
@@ -148,22 +158,10 @@ private:
 };
 
 
-
-
-
 /********************************************************************************
 The scan iterator is NOT required to be implemented for the part 1 of the project 
 ********************************************************************************/
 
-// Comparison Operator (NOT needed for part 1 of the project)
-typedef enum { EQ_OP = 0, // no condition// = 
-           LT_OP,      // <
-           LE_OP,      // <=
-           GT_OP,      // >
-           GE_OP,      // >=
-           NE_OP,      // !=
-           NO_OP       // no condition
-} CompOp;
 
 # define RBFM_EOF (-1)  // end of a scan operator
 
@@ -200,13 +198,12 @@ public:
     RBFM_ScanIterator() {
 
       opened = false;
-      fileHandle = -1;
       currentRid.pageNum = 0;
       currentRid.slotNum = -1;
 
       conditionAttrIndex = -1;
       op = NO_OP;
-      value = null;
+      value = NULL;
 
       recordDescriptor.clear();
       projectedDescriptor.clear();
@@ -216,8 +213,11 @@ public:
     // Never keep the results in the memory. When getNextRecord() is called, 
     // a satisfying record needs to be fetched from the file.
     // "data" follows the same format as RecordBasedFileManager::insertRecord().
-    RC getNextRecord(RID &rid, void *data) { return RBFM_EOF; };
-    RC close() { return -1; };
+    RC getNextRecord(RID &rid, void *data);
+    RC close();
+
+    // self defined functions
+    bool opCompare(void* ref1, void* ref2, CompOp op, AttrType type);
 };
 
 
