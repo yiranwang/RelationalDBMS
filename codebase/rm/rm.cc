@@ -47,7 +47,6 @@ void RelationManager::prepareApiTableRecord(const int tableId, const string &tab
     memcpy((char*)data + offset, tableName.c_str(), tableName.length());
     offset += tableName.length();
 
-<<<<<<< Updated upstream
     // write fileName length
     *(int*)((char*)data + offset) = fileName.length();
     offset += sizeof(int);
@@ -55,13 +54,7 @@ void RelationManager::prepareApiTableRecord(const int tableId, const string &tab
     memcpy((char*)data + offset, fileName.c_str(), fileName.length());
     offset += fileName.length();
     size = offset; 
-=======
-    memcpy((char*)data + offset, fileName.c_str(), fileName.length());
 
-    if (DEBUG) {
-        fprintf(stderr, "tableName is : %s\n", tableName.c_str());
-    }
->>>>>>> Stashed changes
 }
 
 
@@ -88,16 +81,9 @@ void RelationManager::prepareApiColumnRecord(const int tableId, const string &co
     *(int*)((char*)data + offset) = columnLength;
     offset += sizeof(int);
 
-<<<<<<< Updated upstream
     *(int*)((char*)data + offset) = position;
     offset += sizeof(int);
-=======
-    memcpy((char*)data + offset, &position, sizeof(int));
 
-    if (DEBUG) {
-        fprintf(stderr, "columnName is : %s\n", columnName.c_str());
-    }
->>>>>>> Stashed changes
 }
 
 
@@ -116,9 +102,8 @@ RC RelationManager::createCatalog(){
 	void *tmpData = malloc(PAGE_SIZE);
     RID dummyRid;
     memset(tmpData, 0, PAGE_SIZE);
-<<<<<<< Updated upstream
+    
     int apiTableRecordSize = 0;
-
 
     prepareApiTableRecord(1, TABLES_TABLE_NAME, TABLES_FILE_NAME, tmpData, apiTableRecordSize);
 
@@ -129,31 +114,7 @@ RC RelationManager::createCatalog(){
     memset(tmpData, 0, PAGE_SIZE);
     prepareApiTableRecord(2, COLUMNS_TABLE_NAME, COLUMNS_FILE_NAME, tmpData, apiTableRecordSize);
     if (rbfm->insertRecord(fileHandle, columnRecordDescriptor, tmpData, dummyRid) < 0) {
-=======
-    prepareApiTableRecord(1, TABLES_TABLE_NAME, TABLES_FILE_NAME, tmpData);
 
-    if (DEBUG) {
-        printf("prepareApiTableRecord done.\n");
-    }
-
-    if (rbfm->insertRecord(fileHandle, tableRecordDescriptor, 
-                tmpData, dummyRid) < 0) {
-        return -1;
-    }
-    if (DEBUG) {
-        printf("insertRecord done.\n");
-    }
-
-    memset(tmpData, 0, PAGE_SIZE);
-    prepareApiTableRecord(2, COLUMNS_TABLE_NAME, COLUMNS_FILE_NAME, tmpData);
-
-    if (DEBUG) {
-        fprintf(stderr, "prepareApiTableRecord done.\n");
-    }
-
-    if (rbfm->insertRecord(fileHandle, columnRecordDescriptor, 
-                tmpData, dummyRid) < 0) {
->>>>>>> Stashed changes
         return -1;
     }
 
