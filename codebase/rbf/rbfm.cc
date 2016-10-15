@@ -41,13 +41,16 @@ RC RecordBasedFileManager::closeFile(FileHandle &fileHandle) {
 
 RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, 
         const void *data, RID &rid) {
+
+
+    printf("inside rbfm::insertRecord\n");
     short insertOffset = -1;  // location on the page to insert the record
     short recordSize = -1;
     char *tmpRecord = (char*)malloc(PAGE_SIZE);
     // get tmpRecord, recordSize
     if (composeInnerRecord(recordDescriptor, data, tmpRecord, recordSize) < 0) {
         if (DEBUG) {
-            return -1;
+            printf("failed compose inner record \n");
         }
         delete tmpRecord;
         return -1;

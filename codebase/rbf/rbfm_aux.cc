@@ -142,6 +142,8 @@ RC RecordBasedFileManager::findInsertLocation(FileHandle &fileHandle, const shor
 RC RecordBasedFileManager::composeInnerRecord(const vector<Attribute> &recordDescriptor, const void *data, 
     void *tmpRecord, short &size) {
 
+    printf("inside composeInnerRecord\n");
+
     bool nullBit = false;
     int fieldCount = recordDescriptor.size();
     int nullIndicatorSize = getNullIndicatorSize(fieldCount);

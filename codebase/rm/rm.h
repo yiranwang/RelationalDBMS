@@ -10,10 +10,10 @@
 using namespace std;
 
 # define RM_EOF (-1)  // end of a scan operator
-# define TABLES_TABLE_NAME "Tables"
-# define TABLES_FILE_NAME "Tables"
-# define COLUMNS_TABLE_NAME "Columns"
-# define COLUMNS_FILE_NAME "Columns"
+const string TABLES_TABLE_NAME = "Tables";
+const string TABLES_FILE_NAME = "Tables";
+const string COLUMNS_TABLE_NAME = "Columns";
+const string COLUMNS_FILE_NAME = "Columns";
 
 
 // RM_ScanIterator is an iteratr to go through tuples

@@ -81,22 +81,26 @@ RC RelationManager::createCatalog(){
 	if (rbfm->createFile(TABLES_FILE_NAME) < 0) {
         return -1;
     }
+    printf("create file done\n");
     if (rbfm->openFile(TABLES_FILE_NAME, fileHandle) < 0) {
         return -1;
     }
+    printf("open file done\n");
 	void *tmpData = malloc(PAGE_SIZE);
     RID dummyRid;
     // insert table records
     memset(tmpData, 0, PAGE_SIZE);
     prepareApiTableRecord(1, TABLES_TABLE_NAME, TABLES_FILE_NAME, tmpData);
-    if (rbfm->insertRecord(fileHandle, tableRecordDescriptor, 
-                tmpData, dummyRid) < 0) {
+    printf("prepare api table record done\n");
+    if (rbfm->insertRecord(fileHandle, tableRecordDescriptor, tmpData, dummyRid) < 0) {
+        perror("createCatalog");
         return -1;
     }
+    printf("insert record done\n");
     memset(tmpData, 0, PAGE_SIZE);
     prepareApiTableRecord(2, COLUMNS_TABLE_NAME, COLUMNS_FILE_NAME, tmpData);
-    if (rbfm->insertRecord(fileHandle, columnRecordDescriptor, 
-                tmpData, dummyRid) < 0) {
+    if (rbfm->insertRecord(fileHandle, columnRecordDescriptor, tmpData, dummyRid) < 0) {
+        perror("createCatalog");
         return -1;
     }
     if (rbfm->closeFile(fileHandle) < 0) {
@@ -106,69 +110,72 @@ RC RelationManager::createCatalog(){
 	//create and open column file
     //prepare and insert column records
 	if (rbfm->createFile(COLUMNS_FILE_NAME) < 0) {
+        perror("createCatalog");
         return -1;
     }
     if (rbfm->openFile(COLUMNS_FILE_NAME, fileHandle) < 0) {
+        perror("createCatalog");
         return -1;
     }
     
     memset(tmpData, 0, PAGE_SIZE);
     prepareApiColumnRecord(1, "table-id", TypeInt, 4, 1, tmpData);
-    if (rbfm->insertRecord(fileHandle, columnRecordDescriptor, 
-                tmpData, dummyRid) < 0) {
+    if (rbfm->insertRecord(fileHandle, columnRecordDescriptor, tmpData, dummyRid) < 0) {
+        perror("insertRecord");
         return -1;
     }
 
     memset(tmpData, 0, PAGE_SIZE);
     prepareApiColumnRecord(1, "table-name", TypeVarChar, 50, 2, tmpData);
-    if (rbfm->insertRecord(fileHandle, columnRecordDescriptor, 
-                tmpData, dummyRid) < 0) {
+    if (rbfm->insertRecord(fileHandle, columnRecordDescriptor, tmpData, dummyRid) < 0) {
+        perror("insertRecord");
         return -1;
     }
 
     memset(tmpData, 0, PAGE_SIZE);
     prepareApiColumnRecord(1, "file-name", TypeVarChar, 50, 3, tmpData);
-    if (rbfm->insertRecord(fileHandle, columnRecordDescriptor, 
-                tmpData, dummyRid) < 0) {
+    if (rbfm->insertRecord(fileHandle, columnRecordDescriptor, tmpData, dummyRid) < 0) {
+        perror("insertRecord");
         return -1;
     }
     
     memset(tmpData, 0, PAGE_SIZE);
     prepareApiColumnRecord(2, "table-id", TypeInt, 4, 1, tmpData);
-    if (rbfm->insertRecord(fileHandle, columnRecordDescriptor, 
-                tmpData, dummyRid) < 0) {
+    if (rbfm->insertRecord(fileHandle, columnRecordDescriptor, tmpData, dummyRid) < 0) {
+        perror("insertRecord");
         return -1;
     }
 
     memset(tmpData, 0, PAGE_SIZE);
     prepareApiColumnRecord(2, "column-name", TypeVarChar, 50, 2, tmpData);
-    if (rbfm->insertRecord(fileHandle, columnRecordDescriptor, 
-                tmpData, dummyRid) < 0) {
+    if (rbfm->insertRecord(fileHandle, columnRecordDescriptor, tmpData, dummyRid) < 0) {
+        perror("insertRecord");
         return -1;
     }
 
     memset(tmpData, 0, PAGE_SIZE);
     prepareApiColumnRecord(2, "column-type", TypeInt, 4, 3, tmpData);
-    if (rbfm->insertRecord(fileHandle, columnRecordDescriptor, 
-                tmpData, dummyRid) < 0) {
+    if (rbfm->insertRecord(fileHandle, columnRecordDescriptor, tmpData, dummyRid) < 0) {
+        perror("insertRecord");
         return -1;
     }
         
     memset(tmpData, 0, PAGE_SIZE);
     prepareApiColumnRecord(2, "column-length", TypeInt, 4, 4, tmpData);
-    if (rbfm->insertRecord(fileHandle, columnRecordDescriptor, 
-                tmpData, dummyRid) < 0) {
+    if (rbfm->insertRecord(fileHandle, columnRecordDescriptor, tmpData, dummyRid) < 0) {
+        perror("insertRecord");
         return -1;
     }
 
     memset(tmpData, 0, PAGE_SIZE);
     prepareApiColumnRecord(2, "column-position", TypeInt, 4, 5, tmpData);
-    if (rbfm->insertRecord(fileHandle, columnRecordDescriptor, 
-                tmpData, dummyRid) < 0) {
+    if (rbfm->insertRecord(fileHandle, columnRecordDescriptor, tmpData, dummyRid) < 0) {
+        perror("insertRecord");
         return -1;
     }
 
     if (rbfm->closeFile(fileHandle) < 0) {
+        perror("closefile");
         return -1;
     }
     
@@ -263,6 +270,9 @@ RC RelationManager::deleteTable(const string &tableName)
 
 RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &attrs)
 {
+    if (DEBUG) {
+        printf("pussy");
+    }
     int tableId;
     RID rid;
     
