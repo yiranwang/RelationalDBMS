@@ -9,6 +9,8 @@
 
 using namespace std;
 
+# define DEBUG 1
+
 # define RM_EOF (-1)  // end of a scan operator
 const string TABLES_TABLE_NAME = "Tables";
 const string TABLES_FILE_NAME = "Tables";

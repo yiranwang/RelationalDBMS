@@ -47,6 +47,7 @@ void RelationManager::prepareApiTableRecord(const int tableId, const string &tab
     memcpy((char*)data + offset, tableName.c_str(), tableName.length());
     offset += tableName.length();
 
+<<<<<<< Updated upstream
     // write fileName length
     *(int*)((char*)data + offset) = fileName.length();
     offset += sizeof(int);
@@ -54,6 +55,13 @@ void RelationManager::prepareApiTableRecord(const int tableId, const string &tab
     memcpy((char*)data + offset, fileName.c_str(), fileName.length());
     offset += fileName.length();
     size = offset; 
+=======
+    memcpy((char*)data + offset, fileName.c_str(), fileName.length());
+
+    if (DEBUG) {
+        fprintf(stderr, "tableName is : %s\n", tableName.c_str());
+    }
+>>>>>>> Stashed changes
 }
 
 
@@ -80,8 +88,16 @@ void RelationManager::prepareApiColumnRecord(const int tableId, const string &co
     *(int*)((char*)data + offset) = columnLength;
     offset += sizeof(int);
 
+<<<<<<< Updated upstream
     *(int*)((char*)data + offset) = position;
     offset += sizeof(int);
+=======
+    memcpy((char*)data + offset, &position, sizeof(int));
+
+    if (DEBUG) {
+        fprintf(stderr, "columnName is : %s\n", columnName.c_str());
+    }
+>>>>>>> Stashed changes
 }
 
 
@@ -100,6 +116,7 @@ RC RelationManager::createCatalog(){
 	void *tmpData = malloc(PAGE_SIZE);
     RID dummyRid;
     memset(tmpData, 0, PAGE_SIZE);
+<<<<<<< Updated upstream
     int apiTableRecordSize = 0;
 
 
@@ -112,8 +129,38 @@ RC RelationManager::createCatalog(){
     memset(tmpData, 0, PAGE_SIZE);
     prepareApiTableRecord(2, COLUMNS_TABLE_NAME, COLUMNS_FILE_NAME, tmpData, apiTableRecordSize);
     if (rbfm->insertRecord(fileHandle, columnRecordDescriptor, tmpData, dummyRid) < 0) {
+=======
+    prepareApiTableRecord(1, TABLES_TABLE_NAME, TABLES_FILE_NAME, tmpData);
+
+    if (DEBUG) {
+        printf("prepareApiTableRecord done.\n");
+    }
+
+    if (rbfm->insertRecord(fileHandle, tableRecordDescriptor, 
+                tmpData, dummyRid) < 0) {
         return -1;
     }
+    if (DEBUG) {
+        printf("insertRecord done.\n");
+    }
+
+    memset(tmpData, 0, PAGE_SIZE);
+    prepareApiTableRecord(2, COLUMNS_TABLE_NAME, COLUMNS_FILE_NAME, tmpData);
+
+    if (DEBUG) {
+        fprintf(stderr, "prepareApiTableRecord done.\n");
+    }
+
+    if (rbfm->insertRecord(fileHandle, columnRecordDescriptor, 
+                tmpData, dummyRid) < 0) {
+>>>>>>> Stashed changes
+        return -1;
+    }
+
+    if (DEBUG) {
+        fprintf(stderr, "insertRecord done.\n");
+    }
+
     if (rbfm->closeFile(fileHandle) < 0) {
         return -1;
     }
@@ -278,8 +325,16 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
     }
     int tableId;
     RID rid;
+    if (DEBUG) {
+        fprintf(stderr, "tableName is :%s\n", tableName.c_str());
+    }
     
     getTableIdByTableName(tableId, rid, tableName);
+
+    if (DEBUG) {
+        fprintf(stderr, "tableName is :%s\n", tableName.c_str());
+        //fprintf(stderr, "tableId is :%d\n", tableId);
+    }
 
     vector<string> attributeNames;
     attributeNames.push_back("column-name");
@@ -549,17 +604,20 @@ void RelationManager::getTableIdByTableName(int &tableId, RID &rid, const string
     attributeNames.push_back("table-id");
 
     //search in "Tables" to find the corresponding table-id for tableName
-    RM_ScanIterator rm_ScanIterator;
-    scan("Tables", "table-name", EQ_OP, tableName.c_str(), attributeNames, rm_ScanIterator);
+    FileHandle fileHandle;
+    RBFM_ScanIterator rbfm_ScanIterator;
+    rbfm->openFile("Tables", fileHandle);
+    rbfm->scan(fileHandle, tableRecordDescriptor, "table-name", EQ_OP, tableName.c_str(), attributeNames, rbfm_ScanIterator);
 
     void *tupleDeleted = malloc(PAGE_SIZE);
 
-    rm_ScanIterator.getNextTuple(rid, tupleDeleted);
-    rm_ScanIterator.close();
+    rbfm_ScanIterator.getNextRecord(rid, tupleDeleted);
 
     tableId = *(int*)((char*)tupleDeleted + 1);
 
+    rbfm_ScanIterator.close();
     free(tupleDeleted);
+    rbfm->closeFile(fileHandle);
 }
 
 bool fexists(const std::string& filename) {

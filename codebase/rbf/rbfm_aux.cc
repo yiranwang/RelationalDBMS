@@ -3,6 +3,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <iostream>
 
 
 int RecordBasedFileManager::getNullIndicatorSize(const int fieldCount) { 
@@ -171,11 +172,25 @@ RC RecordBasedFileManager::composeInnerRecord(const vector<Attribute> &recordDes
                     int varCharLen = *(int*)((char*)data + dataOffset);
                     memcpy((char*)tmpRecord + recordOffset, (char*)data + dataOffset, sizeof(int) + varCharLen);
 
+                    if (DEBUG) {
+                        printf("fieldIndex:%d\n", fieldIndex);
+                        string name((char*)data + dataOffset, sizeof(int) + varCharLen);
+                        printf("name:%s\n", name.c_str());
+                    }
+
                     // move offset in data and record for next field
                     dataOffset += sizeof(int) + varCharLen;
                     recordOffset += sizeof(int) + varCharLen;
+
                 } else {
                     memcpy((char*)tmpRecord + recordOffset, (char*)data + dataOffset, sizeof(int));
+
+                    if (DEBUG) {
+                        printf("fieldIndex:%d\n", fieldIndex);
+                        int tableid = *(int*)((char*)tmpRecord + recordOffset);
+                        printf("table-id:%d\n", tableid);
+                    }
+
                     dataOffset += sizeof(int);
                     recordOffset += sizeof(int);
                 }
