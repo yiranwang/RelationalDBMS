@@ -1,6 +1,9 @@
 
 #include "rm.h"
 #include <stdlib.h>
+#include <fstream>
+
+bool fexists(const std::string& filename);
 
 RelationManager* RelationManager::_rm = 0;
 
@@ -17,13 +20,15 @@ RelationManager::RelationManager()
 	createTableRecordDescriptor(tableRecordDescriptor);
 
 	createColumnRecordDescriptor(columnRecordDescriptor);
+
+    countTableNumber = 0;
 }
 
 RelationManager::~RelationManager(){
 }
 
-void RelationManager::prepareApiTableRecord(const int tableId, 
-        const string &tableName, const string &fileName, void *data) {
+void RelationManager::prepareApiTableRecord(const int tableId, const string &tableName, 
+    const string &fileName, void *data) {
    
     // data is memset to 0
     // null indicator only needs 1 byte, already set to 0
@@ -32,19 +37,26 @@ void RelationManager::prepareApiTableRecord(const int tableId,
     memcpy((char*)data + offset, &tableId, sizeof(int));
     offset += sizeof(int);
 
+    int tableNameLength = tableName.size();
+    memcpy((char*)data + offset, &tableNameLength, sizeof(int));
+    offset += sizeof(int);
+
     memcpy((char*)data + offset, tableName.c_str(), tableName.length());
     offset += tableName.length();
 
     memcpy((char*)data + offset, fileName.c_str(), fileName.length()); 
 }
 
-void RelationManager::prepareApiColumnRecord(const int tableId, 
-        const string &columnName, const AttrType type, 
-        const int columnLength, const int position, void *data) {
+void RelationManager::prepareApiColumnRecord(const int tableId, const string &columnName, 
+    const AttrType type, const int columnLength, const int position, void *data) {
 
     int offset = 1;         // null indicator is 1 byte, already set to 0
     
     memcpy((char*)data + offset, &tableId, sizeof(int));
+    offset += sizeof(int);
+
+    int columnNameLength = columnName.size();
+    memcpy((char*)data + offset, &columnNameLength, sizeof(int));
     offset += sizeof(int);
     
     memcpy((char*)data + offset, columnName.c_str(), columnName.length());
@@ -162,6 +174,9 @@ RC RelationManager::createCatalog(){
     
     
     free(tmpData);
+
+    countTableNumber = 2;
+
     return 0;
 }
 
@@ -178,37 +193,221 @@ RC RelationManager::deleteCatalog()
 
 RC RelationManager::createTable(const string &tableName, const vector<Attribute> &attrs)
 {
-    return -1;
+    countTableNumber++;
+
+    RID rid;
+    void *data = malloc(PAGE_SIZE);
+    FileHandle fileHandle;
+
+    string fileName = tableName;
+    if (rbfm->createFile(fileName) < 0) {
+        return -1;
+    }
+
+    prepareApiTableRecord(countTableNumber, tableName, fileName, data);
+
+    if (insertTuple("Tables", data, rid) < 0) {
+        return -1;
+    }
+
+    Attribute attribute;
+
+    for (int i = 0; i < attrs.size(); i++) {
+        attribute = attrs[i];
+        prepareApiColumnRecord(countTableNumber, attribute.name, attribute.type, attribute.length, i + 1, data);
+        if (insertTuple("Columns", data, rid) < 0) {
+            return -1;
+        }
+    }
+
+    free(data);
+    return 0;
 }
 
 RC RelationManager::deleteTable(const string &tableName)
-{
-    return -1;
+{   
+    if (tableName == "Tables" || tableName == "Columns" || !fexists(tableName)) {
+        return -1;
+    }
+
+    if (rbfm->destroyFile(tableName) < 0) {
+        return -1;
+    }
+
+    int tableId;
+    RID rid;
+    
+    getTableIdByTableName(tableId, rid, tableName);
+
+    if (deleteTuple("Tables", rid) < 0) {
+        return -1;
+    }
+
+    vector<string> attributeNames;
+    attributeNames.push_back("table-id");
+    RM_ScanIterator rm_ScanIterator;
+    void *tupleDeleted = malloc(PAGE_SIZE);
+
+    //search in "Tables" to find the corresponding tuples according to table-id
+    scan("Columns", "table-id", EQ_OP, &tableId, attributeNames, rm_ScanIterator);
+    while (rm_ScanIterator.getNextTuple(rid, tupleDeleted) != -1) {
+        if (deleteTuple("Columns", rid) < 0) {
+            return -1;
+        }
+    }
+    rm_ScanIterator.close();
+    free(tupleDeleted);
+
+    return 0;
 }
 
 RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &attrs)
 {
-    return -1;
+    int tableId;
+    RID rid;
+    
+    getTableIdByTableName(tableId, rid, tableName);
+
+    vector<string> attributeNames;
+    attributeNames.push_back("column-name");
+    attributeNames.push_back("column-type");
+    attributeNames.push_back("column-length");
+
+    RBFM_ScanIterator rbfm_ScanIterator;
+    FileHandle fileHandle;
+
+    if (rbfm->openFile("Columns", fileHandle) < 0) {
+        return -1;
+    }
+    rbfm->scan(fileHandle, columnRecordDescriptor, "table-id", EQ_OP, &tableId, attributeNames, rbfm_ScanIterator);
+
+    void *recordData = malloc(PAGE_SIZE);
+
+    Attribute attri;
+    int attriLength;
+    char* attriName = (char*)malloc(51);
+    int attriNameLength;
+    AttrType attriType;
+    int offset = 0;
+    
+    while (rbfm_ScanIterator.getNextRecord(rid, recordData) != -1) {
+        offset = 1;
+
+        memcpy(&attriNameLength, (char*)recordData + offset, sizeof(int));
+        offset += sizeof(int);
+
+        memcpy(attriName, (char*)recordData + offset, attriNameLength);
+        offset += attriNameLength;
+
+        memcpy(&attriType, (char*)recordData + offset, sizeof(int));
+        offset += sizeof(int);
+
+        memcpy(&attriLength, (char*)recordData + offset, sizeof(int));
+        offset += sizeof(int);
+
+        attriName[attriNameLength] = '\0';
+        attri.name = attriName;
+        attri.type = attriType;
+        attri.length = attriLength;
+        attrs.push_back(attri);
+    }
+
+    rbfm_ScanIterator.close();
+    free(recordData);
+    free(attriName);
+    if (rbfm->closeFile(fileHandle) < 0) {
+        return -1;
+    }
+
+    return 0;
 }
 
 RC RelationManager::insertTuple(const string &tableName, const void *data, RID &rid)
-{
-    return -1;
+{   
+    FileHandle fileHandle;
+    vector<Attribute> recordDescriptor;
+
+    getAttributes(tableName, recordDescriptor);
+
+    if (rbfm->openFile(tableName, fileHandle) < 0) {
+        return -1;
+    }
+
+    if (rbfm->insertRecord(fileHandle, recordDescriptor, data, rid) < 0) {
+        return -1;
+    }
+
+    if (rbfm->closeFile(fileHandle) < 0) {
+        return -1;
+    }
+
+    return 0;
 }
 
 RC RelationManager::deleteTuple(const string &tableName, const RID &rid)
 {
-    return -1;
+    FileHandle fileHandle;
+    vector<Attribute> recordDescriptor;
+
+    getAttributes(tableName, recordDescriptor);
+
+    if (rbfm->openFile(tableName, fileHandle) < 0) {
+        return -1;
+    }
+
+    if (rbfm->deleteRecord(fileHandle, recordDescriptor, rid) < 0) {
+        return -1;
+    }
+
+    if (rbfm->closeFile(fileHandle) < 0) {
+        return -1;
+    }
+
+    return 0;
 }
 
 RC RelationManager::updateTuple(const string &tableName, const void *data, 
         const RID &rid) {
-    return -1;
+    FileHandle fileHandle;
+    vector<Attribute> recordDescriptor;
+
+    getAttributes(tableName, recordDescriptor);
+
+    if (rbfm->openFile(tableName, fileHandle) < 0) {
+        return -1;
+    }
+
+    if (rbfm->updateRecord(fileHandle, recordDescriptor, data, rid) < 0) {
+        return -1;
+    }
+
+    if (rbfm->closeFile(fileHandle) < 0) {
+        return -1;
+    }
+
+    return 0;
 }
 
 RC RelationManager::readTuple(const string &tableName, const RID &rid, 
         void *data) {
-    return -1;
+    FileHandle fileHandle;
+    vector<Attribute> recordDescriptor;
+
+    getAttributes(tableName, recordDescriptor);
+
+    if (rbfm->openFile(tableName, fileHandle) < 0) {
+        return -1;
+    }
+
+    if (rbfm->readRecord(fileHandle, recordDescriptor, rid, data) < 0) {
+        return -1;
+    }
+
+    if (rbfm->closeFile(fileHandle) < 0) {
+        return -1;
+    }
+
+    return 0;
 }
 
 RC RelationManager::printTuple(const vector<Attribute> &attrs, 
@@ -221,20 +420,21 @@ RC RelationManager::readAttribute(const string &tableName, const RID &rid,
     FileHandle fileHandle;
     vector<Attribute> recordDescriptor;
 
-    RC rc = rbfm->openFile(tableName, fileHandle);
+    getAttributes(tableName, recordDescriptor);
 
-    if (rc == 0) {
-    	getAttributes(tableName, recordDescriptor);
-
-    	//is data returned contains only 1 byte nullIndicator??
-    	RC rc2 = rbfm->readAttribute(fileHandle, recordDescriptor, rid, attributeName, data);
-
-    	rbfm->closeFile(fileHandle);
-    	return rc2;
-
-    }else {
-    	return -1;
+    if (rbfm->openFile(tableName, fileHandle) < 0) {
+        return -1;
     }
+
+    if (rbfm->readAttribute(fileHandle, recordDescriptor, rid, attributeName, data) < 0) {
+        return -1;
+    }
+
+    if (rbfm->closeFile(fileHandle) < 0) {
+        return -1;
+    }
+
+    return 0;
 }
 
 RC RelationManager::scan(const string &tableName,
@@ -244,7 +444,27 @@ RC RelationManager::scan(const string &tableName,
       const vector<string> &attributeNames,
       RM_ScanIterator &rm_ScanIterator)
 {
-    return -1;
+    FileHandle fileHandle;
+    vector<Attribute> recordDescriptor;
+    RBFM_ScanIterator rbfm_ScanIterator;
+
+    getAttributes(tableName, recordDescriptor);
+
+    if (rbfm->openFile(tableName, fileHandle) < 0) {
+        return -1;
+    }
+
+    if (rbfm->scan(fileHandle, recordDescriptor , conditionAttribute, compOp, value, attributeNames, 
+        rbfm_ScanIterator) < 0) {
+        return -1;
+    }
+    rm_ScanIterator.rbfm_ScanIterator = rbfm_ScanIterator;
+
+    if (rbfm->closeFile(fileHandle) < 0) {
+        return -1;
+    }
+
+    return 0;
 }
 
 // Extra credit work
@@ -309,5 +529,28 @@ void RelationManager::createColumnRecordDescriptor(vector<Attribute> &recordDesc
 	attr5.type = TypeInt;
 	attr5.length = (AttrLength)4;
 	recordDescriptor.push_back(attr5);
+}
+
+void RelationManager::getTableIdByTableName(int &tableId, RID &rid, const string &tableName) {
+    vector<string> attributeNames;
+    attributeNames.push_back("table-id");
+
+    //search in "Tables" to find the corresponding table-id for tableName
+    RM_ScanIterator rm_ScanIterator;
+    scan("Tables", "table-name", EQ_OP, tableName.c_str(), attributeNames, rm_ScanIterator);
+
+    void *tupleDeleted = malloc(PAGE_SIZE);
+
+    rm_ScanIterator.getNextTuple(rid, tupleDeleted);
+    rm_ScanIterator.close();
+
+    tableId = *(int*)((char*)tupleDeleted + 1);
+
+    free(tupleDeleted);
+}
+
+bool fexists(const std::string& filename) {
+  std::ifstream ifile(filename.c_str());
+  return (bool)ifile;
 }
 

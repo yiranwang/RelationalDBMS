@@ -22,9 +22,17 @@ public:
     RM_ScanIterator() {};
     ~RM_ScanIterator() {};
 
+    RBFM_ScanIterator rbfm_ScanIterator;
+
     // "data" follows the same format as RelationManager::insertTuple()
-    RC getNextTuple(RID &rid, void *data) { return RM_EOF; };
-    RC close() { return -1; };
+    RC getNextTuple(RID &rid, void *data) { 
+        return rbfm_ScanIterator.getNextRecord(rid, data);
+    };
+
+    RC close() { 
+        rbfm_ScanIterator.close();
+        return 0; 
+    };
 };
 
 
@@ -40,6 +48,9 @@ public:
 
     vector<Attribute> columnRecordDescriptor;
 
+    //count the number of tables that have been created
+    int countTableNumber;
+
    
     // ======= start of self defined functions =====
     void prepareApiTableRecord(const int tableId, const string &tableName,
@@ -47,6 +58,7 @@ public:
     void prepareApiColumnRecord(const int tableId, const string &columnName, 
             const AttrType type, const int columnLength, const int position,
             void *data);
+    void getTableIdByTableName(int &tableId, RID &rid, const string &tableName);
     
     // ======= end of self defined functions =====
     
