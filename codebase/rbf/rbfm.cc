@@ -39,13 +39,13 @@ RC RecordBasedFileManager::closeFile(FileHandle &fileHandle) {
 }
 
 
-RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, 
-        const vector<Attribute> &recordDescriptor, const void *data, RID &rid) {
+RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, 
+        const void *data, RID &rid) {
     short insertOffset = -1;  // location on the page to insert the record
     short recordSize = -1;
     char *tmpRecord = (char*)malloc(PAGE_SIZE);
     // get tmpRecord, recordSize
-    if (composeRecord(recordDescriptor, data, tmpRecord, recordSize) < 0) {
+    if (composeInnerRecord(recordDescriptor, data, tmpRecord, recordSize) < 0) {
         if (DEBUG) {
             return -1;
         }
@@ -108,8 +108,9 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle,
     return 0;
 }
 
-RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, 
-        const vector<Attribute> &recordDescriptor, const RID &rid, void *data) {
+
+RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, 
+        const RID &rid, void *data) {
     // read the page
     Page *page = new Page;
     fileHandle.readPage(rid.pageNum, page);
@@ -187,6 +188,7 @@ RC RecordBasedFileManager::readRecord(FileHandle &fileHandle,
     return 0;
 }
 
+
 RC RecordBasedFileManager::printRecord(
         const vector<Attribute> &recordDescriptor, const void *data) {
     // Null-indicators initialization
@@ -237,8 +239,8 @@ RC RecordBasedFileManager::printRecord(
 }
 
 
-RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, 
-        const vector<Attribute> &recordDescriptor, const RID &rid) {
+RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, 
+        const RID &rid) {
     // read the page
     Page *page = new Page;
     fileHandle.readPage(rid.pageNum, page);
@@ -282,8 +284,7 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle,
         }
     
         // adjust offset of the rest records' slots
-        for (int slotIndex = rid.slotNum + 1; 
-                slotIndex < page->header.slotCount; slotIndex++) {
+        for (int slotIndex = rid.slotNum + 1; slotIndex < page->header.slotCount; slotIndex++) {
             Slot curSlot = {};
             readSlotFromPage(page, slotIndex, curSlot);
             curSlot.offset -= slot.length;
@@ -307,8 +308,7 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle,
     return 0;
 }
 
-RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, 
-        const vector<Attribute> &recordDescriptor, 
+RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, 
         const void *data, const RID &rid) {
     // read the page
     Page *page = new Page;
@@ -342,7 +342,7 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle,
     // first compose the updated inner record and get its size
     short updatedRecordSize = -1;
     char *updatedInnerRecord = (char*)malloc(PAGE_SIZE);
-    if (composeRecord(recordDescriptor, data, updatedInnerRecord, 
+    if (composeInnerRecord(recordDescriptor, data, updatedInnerRecord, 
                 updatedRecordSize) < 0) {
         if (DEBUG) {
             printf("failed to compose record\n");
@@ -358,10 +358,8 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle,
     // store the updated record at the original position and adjust the rest
     if (page->header.freeSpace >= delta) {
         shiftAmount = delta;
-        shiftBytes((char*)page + slot.offset + slot.length, 
-                restSize, shiftAmount);  
-        memcpy((char*)page + slot.offset, updatedInnerRecord, 
-                updatedRecordSize); 
+        shiftBytes((char*)page + slot.offset + slot.length, restSize, shiftAmount);  
+        memcpy((char*)page + slot.offset, updatedInnerRecord, updatedRecordSize); 
         page->header.freeSpace -= delta;
         page->header.freeSpaceOffset += delta;
         slot.length = updatedRecordSize;
@@ -374,8 +372,7 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle,
         // replace record with RID
         // shift rest records to the LEFT by slot.length - sizeof(RID)
         shiftAmount = sizeof(RID) - slot.length;
-        shiftBytes((char*)page + slot.offset + slot.length,
-                restSize, shiftAmount);
+        shiftBytes((char*)page + slot.offset + slot.length, restSize, shiftAmount);
         // insert the update record and get targetRid
         RID targetRid = {};
         if (insertRecord(fileHandle, recordDescriptor, data, targetRid) < 0) {
@@ -408,16 +405,13 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle,
     return 0;
 }
 
-RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, 
-        const vector<Attribute> &recordDescriptor, const RID &rid, 
-        const string &attributeName, void *data) {
+
+RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, 
+        const RID &rid, const string &attributeName, void *data) {
     void* record = malloc(PAGE_SIZE);    
     memset(record, 0, PAGE_SIZE);
     // read record out 
     if (readRecord(fileHandle, recordDescriptor, rid, record) < 0) {
-        if (DEBUG) {
-            printf("Read record failed\n");
-        }
         return -1;
     }
     if (DEBUG) {
@@ -425,9 +419,9 @@ RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle,
     }
     // find the index of the target attribute
     int attrIndex = 0;
-    for (; strcmp(recordDescriptor[attrIndex].name.c_str(), 
-                attributeName.c_str()) != 0 
+    for (; strcmp(recordDescriptor[attrIndex].name.c_str(), attributeName.c_str()) != 0 
             && attrIndex < recordDescriptor.size(); attrIndex++) {
+
     }
     if (attrIndex == recordDescriptor.size()) {
         if (DEBUG) {
@@ -440,8 +434,7 @@ RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle,
         printf("attrIndex found for %s:%d\n", attributeName.c_str(), attrIndex);
     }
     // find the offset for the attribute
-    short attrOffset = 
-        *(short*)((short*)record + (1 + attrIndex) * sizeof(short)); 
+    short attrOffset = *(short*)((short*)record + (1 + attrIndex) * sizeof(short)); 
     if (attrOffset == -1) {
         if (DEBUG) {
             printf("attribute: %s is NULL\n", attributeName.c_str());
