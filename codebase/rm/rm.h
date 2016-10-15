@@ -53,11 +53,10 @@ public:
 
    
     // ======= start of self defined functions =====
-    void prepareApiTableRecord(const int tableId, const string &tableName,
-            const string &fileName, void *data); 
-    void prepareApiColumnRecord(const int tableId, const string &columnName, 
-            const AttrType type, const int columnLength, const int position,
-            void *data);
+    void prepareApiTableRecord(const int tableId, const string &tableName, const string &fileName, 
+            void *data, int &size); 
+    void prepareApiColumnRecord(const int tableId, const string &columnName, const AttrType type, 
+            const int columnLength, const int position, void *data);
     void getTableIdByTableName(int &tableId, RID &rid, const string &tableName);
     
     // ======= end of self defined functions =====

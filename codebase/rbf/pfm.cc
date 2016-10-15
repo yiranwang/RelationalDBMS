@@ -52,6 +52,7 @@ RC PagedFileManager::destroyFile(const string &fileName)
 RC PagedFileManager::openFile(const string &fileName, FileHandle &fileHandle)
 { 
     if (fileHandle.fd > 0) {
+        printf("file descriptor is larger than 0!\n");
         return -1;
     }
 
@@ -68,6 +69,7 @@ RC PagedFileManager::openFile(const string &fileName, FileHandle &fileHandle)
 RC PagedFileManager::closeFile(FileHandle &fileHandle)
 {
     int rc = close(fileHandle.fd);
+    fileHandle.fd = -1;
     return rc;
 }
 

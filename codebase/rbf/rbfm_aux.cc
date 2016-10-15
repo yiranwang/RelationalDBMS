@@ -142,8 +142,6 @@ RC RecordBasedFileManager::findInsertLocation(FileHandle &fileHandle, const shor
 RC RecordBasedFileManager::composeInnerRecord(const vector<Attribute> &recordDescriptor, const void *data, 
     void *tmpRecord, short &size) {
 
-    printf("inside composeInnerRecord\n");
-
     bool nullBit = false;
     int fieldCount = recordDescriptor.size();
     int nullIndicatorSize = getNullIndicatorSize(fieldCount);
@@ -171,8 +169,7 @@ RC RecordBasedFileManager::composeInnerRecord(const vector<Attribute> &recordDes
                 if (fieldAttr.type == TypeVarChar) {
                     // get varChar length
                     int varCharLen = *(int*)((char*)data + dataOffset);
-                    memcpy((char*)tmpRecord + recordOffset, 
-                            (char*)data + dataOffset, sizeof(int) + varCharLen);
+                    memcpy((char*)tmpRecord + recordOffset, (char*)data + dataOffset, sizeof(int) + varCharLen);
 
                     // move offset in data and record for next field
                     dataOffset += sizeof(int) + varCharLen;
@@ -188,7 +185,9 @@ RC RecordBasedFileManager::composeInnerRecord(const vector<Attribute> &recordDes
                 *(short*)((char*)tmpRecord + sizeof(short) * (1 + fieldIndex)) = -1;
             }
     }
+
     size = recordOffset;
+    printf("compose inner record done \n");
     return 0;
 }
 
@@ -205,10 +204,6 @@ RC RecordBasedFileManager::composeApiTuple(const vector<Attribute> &recordDescri
     // initialize null indicator bytes
     void *nullIndicator = malloc(nullIndicatorSize);
     memset(nullIndicator, 0, nullIndicatorSize);
-
-    // skip (fieldCount + 1) shorts to the starting address of the fields 
-    //char* fieldStartAddress = (char*)innerRecord + sizeof(short) * (1 + recordDescriptor.size());
-    
 
     int bitPos = 7;
     for (int projectedIndex = 0; projectedIndex < projectedDescriptor.size(); projectedIndex++) {
@@ -259,9 +254,6 @@ RC RecordBasedFileManager::composeApiTuple(const vector<Attribute> &recordDescri
     free(nullIndicator);
     return 0;
 }
-
-
-
 
 
 

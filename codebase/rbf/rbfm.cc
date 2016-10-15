@@ -29,8 +29,7 @@ RC RecordBasedFileManager::destroyFile(const string &fileName) {
     return PagedFileManager::instance()->destroyFile(fileName);
 }
 
-RC RecordBasedFileManager::openFile(const string &fileName, 
-        FileHandle &fileHandle) {
+RC RecordBasedFileManager::openFile(const string &fileName, FileHandle &fileHandle) {
     return PagedFileManager::instance()->openFile(fileName, fileHandle);
 }
 
