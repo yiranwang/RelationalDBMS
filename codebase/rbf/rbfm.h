@@ -75,6 +75,8 @@ public:
 
     void readRecordFromPage(Page *page, const short offset, const short recordSize, void *data);
 
+    RC readInnerRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, const void *data);
+
     void insertRecordToPage(Page *page, const short offset, const void *record, const short recordSize);
 
     int getIntData(int offset, const void* data);
@@ -136,7 +138,7 @@ RC deleteRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescripto
 // Assume the RID does not change after an update
 RC updateRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const void *data, const RID &rid);
 
-RC readAttribute(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, const string &attributeName, void *data);
+RC readAttributeFromRecord(const vector<Attribute> &recordDescriptor, void *record, const int conditionAttrIndex, void *data);
 
 // Scan returns an iterator to allow the caller to go through the results one by one. 
 RC scan(FileHandle &fileHandle,
@@ -182,8 +184,8 @@ public:
 
     FileHandle fileHandle;
     
-    // current record id
-    RID currentRid;
+    // next record id
+    RID nextRid;
 
     // predicate
     int conditionAttrIndex;
@@ -191,15 +193,16 @@ public:
     void *value;
 
     vector<Attribute> recordDescriptor;
-    vector<int> projectedDescriptor;
+    vector<Attribute> projectedDescriptor;
+    vector<int> projectedDescriptorIndex;
 
 
 public:
     RBFM_ScanIterator() {
 
       opened = false;
-      currentRid.pageNum = 0;
-      currentRid.slotNum = -1;
+      nextRid.pageNum = 0;
+      nextRid.slotNum = 0;
 
       conditionAttrIndex = -1;
       op = NO_OP;
@@ -207,6 +210,7 @@ public:
 
       recordDescriptor.clear();
       projectedDescriptor.clear();
+      projectedDescriptorIndex.clear();
     };
     ~RBFM_ScanIterator() {};
 

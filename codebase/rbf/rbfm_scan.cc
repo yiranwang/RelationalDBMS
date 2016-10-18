@@ -14,18 +14,24 @@ RC RecordBasedFileManager::scan(FileHandle &fileHandle,
       	const vector<string> &attributeNames, // a list of projected attributes
       	RBFM_ScanIterator &rbfm_ScanIterator) {
 
+
+	//printf("#######  inside rbfm->scan\n");
+
 	rbfm_ScanIterator.opened = true;
 	rbfm_ScanIterator.fileHandle = fileHandle;
 
-
+	// find condition attribute by name
 	int conditionIndex = 0;
 	Attribute fieldAttr;
 	for (; conditionIndex < recordDescriptor.size(); conditionIndex++) {
 		fieldAttr = recordDescriptor[conditionIndex];
 		if (conditionAttribute.compare(fieldAttr.name) == 0) {
+			//printf("conditionAttribute is: %s, index: %d\n", fieldAttr.name.c_str(), conditionIndex);
 			break;
 		}
 	}
+
+
 	rbfm_ScanIterator.conditionAttrIndex = conditionIndex;
 	rbfm_ScanIterator.op = compOp;
 
@@ -36,16 +42,19 @@ RC RecordBasedFileManager::scan(FileHandle &fileHandle,
 		unsigned dataLength = fieldAttr.type == TypeVarChar ? strlen((char*)value) + 1 : sizeof(int);
 		rbfm_ScanIterator.value = malloc(dataLength);
 		memcpy(rbfm_ScanIterator.value, value, dataLength);
+		//printf("copied data of length %d, which is: %s\n", dataLength, (char*)(rbfm_ScanIterator.value));
+
 	}
 
-	// store record descriptor
+	// store record descriptor and projected attributes' index
 	rbfm_ScanIterator.recordDescriptor = recordDescriptor;
-	// store projected attributes' index
+
 	for (int i = 0; i < attributeNames.size(); i++) {
-		string name = attributeNames[i];
+		string curAttrName = attributeNames[i];
 		for (int j = 0; j < recordDescriptor.size(); j++) {
-			if (recordDescriptor[j].name.compare(name) == 0) {
-				rbfm_ScanIterator.projectedDescriptor.push_back(j);
+			if (recordDescriptor[j].name.compare(curAttrName) == 0) {
+				rbfm_ScanIterator.projectedDescriptor.push_back(recordDescriptor[j]);
+				rbfm_ScanIterator.projectedDescriptorIndex.push_back(j);
 			}
 		}
 
@@ -59,68 +68,116 @@ RC RecordBasedFileManager::scan(FileHandle &fileHandle,
 RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) { 
 
 	if (!opened) {
+		printf("Sorry, RBFM_ScanIterator is not opened!\n");
 		return -1;
 	}
 
 	RecordBasedFileManager *rbfm = RecordBasedFileManager::instance();
-	
+
 	// case 1: pageNum >= totalPageNum
 	unsigned totalPageNum = fileHandle.getNumberOfPages();
-	if (currentRid.pageNum >= totalPageNum) {
+	if (nextRid.pageNum >= totalPageNum) {
+		printf("RBFM_EOF reached!\n");
 		return RBFM_EOF;
 	}
 
+
+	// read out the page
 	Page *page = new Page;
-	fileHandle.readPage(currentRid.pageNum, page);
+	fileHandle.readPage(nextRid.pageNum, page);
 	short slotCount = page->header.slotCount;
 
-	// case 2: last record visited on this page, need to scan next page
-	if (currentRid.slotNum == slotCount - 1) {
-		currentRid.pageNum = currentRid.pageNum + 1;
-		currentRid.slotNum = -1;
+	// case 2: invalid slotNum
+	if (nextRid.slotNum > (short)slotCount) {
+		printf("nextRid.slotNum:%d >= slotCount:%d\nSo record to be read does not exist\n", nextRid.slotNum, slotCount);
+		return -1;
+	}
+
+	// case 3: previous record visited is the last one on this page, need to scan next page
+	if (nextRid.slotNum == slotCount) {
+		nextRid.pageNum += 1;
+		nextRid.slotNum = 0;
 		free(page);
 		return getNextRecord(rid, data);
 	}
 
-	// case 3: current record is not the last record on its page, we continue on this page
-	Slot nextSlot = {};
-	currentRid.slotNum += 1;
-	rbfm->readSlotFromPage(page, currentRid.slotNum, nextSlot);
+	// case 4: previous record is not the last record on its page, we continue on this page
+	Slot targetSlot = {};
 
-	// case 3.1: the next slot points to a deleted or redirected record, skip it
-	if (nextSlot.offset == -1 || nextSlot.length == -1) {
+	// read out the slot
+	rbfm->readSlotFromPage(page, nextRid.slotNum, targetSlot);
+
+
+	// case 4.1: the next slot points to a deleted or redirected record, skip it
+	if (targetSlot.offset == -1 || targetSlot.length == -1) {
 		free(page);
+		nextRid.slotNum += 1;						// go for next slot
 		return getNextRecord(rid, data);
 	}
 
-	// case 3.2: the next record is on this page
+	// case 4.2: the targe record is on this page
 
 	// read out the record
-	void *nextInnerRecord = malloc(PAGE_SIZE);
-	rbfm->readRecordFromPage(page, nextSlot.offset, nextSlot.length, nextInnerRecord);
+	void *targetInnerRecord = malloc(PAGE_SIZE);
+	memset(targetInnerRecord, 0, PAGE_SIZE);
+	rbfm->readRecordFromPage(page, targetSlot.offset, targetSlot.length, targetInnerRecord);
+
+
+	//printf("====== Scan Iterator: The recordDescriptor is:\n");
+	//for (int i = 0; i < projectedDescriptor.size(); i++) {
+	//	printf("%d: %s\t", i, projectedDescriptor[i].name.c_str());
+	//}
+	//printf("\nThe record may contain desired tuple is from RID(%d, %d), offset: %d, length: %d\n", nextRid.pageNum, nextRid.slotNum, targetSlot.offset, targetSlot.length);
+
+	//printf("nullByte is %d\n", ((char*)targetInnerRecord)[0]);
+	//printf("table-ID is %d\n", *(int*)((char*)targetInnerRecord + 1));
+	//printf("This record is like this:\n%s\n", (char*)targetInnerRecord);
+
+	printf("Next record, Formal format:\n");
+	rbfm->printRecord(recordDescriptor, targetInnerRecord);
 
 	// read out the attribute data
+	// case 4.2.1: a NULL field is encountered, skip it
+
+
+
+
 	Attribute conditionAttr = recordDescriptor[conditionAttrIndex];
 	void *attributeData = malloc(PAGE_SIZE);
-	rbfm->readAttribute(fileHandle, recordDescriptor, currentRid, conditionAttr.name, attributeData);
-
-	// case 3.2.1: condition not met, skip this record
-	if (!opCompare(attributeData, value, op, conditionAttr.type)) {
+	if (rbfm->readAttributeFromRecord(recordDescriptor, targetInnerRecord, conditionAttrIndex, attributeData) < 0) {
+		//printf("failed readAttribute: %s\n", conditionAttr.name.c_str());
 		free(page);
-		free(nextInnerRecord);
+		free(targetInnerRecord);
 		free(attributeData);
+		nextRid.slotNum += 1;						// go for next slot
 		return getNextRecord(rid, data);
 	}
 
-	// case 3.2.2: condition met, compose a tuple of this record into data
-	short tupleSize = 0;
-	rbfm->composeApiTuple(recordDescriptor, projectedDescriptor, nextInnerRecord, data, tupleSize);
 
-	rid.pageNum = currentRid.pageNum;
-	rid.slotNum = currentRid.slotNum;
+	// case 4.2.2: condition not met, skip this record
+	if (!opCompare(attributeData, value, op, conditionAttr.type)) {
+		free(page);
+		free(targetInnerRecord);
+		free(attributeData);
+		nextRid.slotNum += 1;						// go for next slot
+		return getNextRecord(rid, data);
+	}
+
+	// case 4.2.3: condition met, compose a tuple of this record into data
+
+	short tupleSize = 0;
+	rbfm->composeApiTuple(recordDescriptor, projectedDescriptorIndex, targetInnerRecord, data, tupleSize);
+
+	
+	//printf("The tuple returned by iterator is:\n");
+	//rbfm->printRecord(projectedDescriptor, data);
+
+	rid.pageNum = nextRid.pageNum;
+	rid.slotNum = nextRid.slotNum;
 	free(page);
-	free(nextInnerRecord);
+	free(targetInnerRecord);
 	free(attributeData);
+	nextRid.slotNum += 1;						// go for next slot
 	return 0;
 };
 
@@ -134,6 +191,7 @@ RC RBFM_ScanIterator::close() {
 	free(value);
 	recordDescriptor.clear();
 	projectedDescriptor.clear();
+	projectedDescriptorIndex.clear();
 	return 0; 
 };
 
@@ -149,6 +207,7 @@ bool RBFM_ScanIterator::opCompare(void* ref1, void* ref2, CompOp op, AttrType ty
     	return false;
     }
     if (type == TypeVarChar) {
+    	printf("comparing %s and %s\n", (char*)ref1, (char*)ref2);
 		string str1((char*)ref1);
 		string str2((char*)ref2);
 		int res = str1.compare(str2);
@@ -166,6 +225,7 @@ bool RBFM_ScanIterator::opCompare(void* ref1, void* ref2, CompOp op, AttrType ty
         int int1 = *(int*)ref1;
         int int2 = *(int*)ref2;
         int res = int1 - int2;
+        printf("comparing %d and %d\n", int1, int2);
         switch (op) {
 			case EQ_OP: return res == 0;
         	case LT_OP: return res < 0;
@@ -181,7 +241,7 @@ bool RBFM_ScanIterator::opCompare(void* ref1, void* ref2, CompOp op, AttrType ty
         float f1 = *(float*)ref1;
         float f2 = *(float*)ref2;
         float res = f1 - f2;
-
+        printf("comparing %f and %f\n", f1, f2);
         switch (op) {
 			case EQ_OP: return res == 0.0;
         	case LT_OP: return res < 0.0;

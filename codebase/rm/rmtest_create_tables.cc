@@ -14,11 +14,14 @@ int main()
 
   rc = rm->createCatalog();
   assert (rc == success && "Creating the Catalog should not fail.");
+
+
   // Delete the actual file and create Table tbl_employee
   remove("tbl_employee");
 
   rc = createTable("tbl_employee");
   assert (rc == success && "Creating a table should not fail.");
+
 
   // Delete the actual file and create Table tbl_employee
   remove("tbl_employee2");

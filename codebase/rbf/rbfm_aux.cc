@@ -134,6 +134,57 @@ RC RecordBasedFileManager::findInsertLocation(FileHandle &fileHandle, const shor
 }
 
 
+RC RecordBasedFileManager::readInnerRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, 
+        const RID &rid, const void *data) {
+
+    // validate pageNum
+    unsigned totalPageNum = fileHandle.getNumberOfPages();
+    if (rid.pageNum >= totalPageNum) {
+        //printf("page to be read does not exist!\n");
+        return -1;
+    }
+
+    // read page
+    Page *page = new Page;
+    if (fileHandle.readPage(rid.pageNum, page) < 0) {
+        //printf("Error in fileHandle.readPage\n");
+        return -1;
+    }
+    short slotCount = page->header.slotCount;
+
+
+    // validate slotNum
+    if (rid.slotNum >= slotCount) {
+        //printf("slot to be read does not exist!\n");
+        return -1;
+    }
+
+    // read slot
+    Slot targetSlot = {};
+    readSlotFromPage(page, rid.slotNum, targetSlot);
+
+
+    // case 1: the record is delete
+    if (targetSlot.offset == -1) {
+        //printf("Record to be read is deleted\n");
+        return -1;
+    }
+
+    // case 2: the record is redirected to another page, trace to that page
+    if (targetSlot.length == -1) {
+        RID targetRid = *(RID*)((char*)page + targetSlot.offset);
+        free(page);
+        return readInnerRecord(fileHandle, recordDescriptor, targetRid, data);
+    }
+
+    // case 3: the record is on this page
+    // read out the target record
+    void *targetInnerRecord = malloc(PAGE_SIZE);
+    readRecordFromPage(page, targetSlot.offset, targetSlot.length, targetInnerRecord);
+    free(page);
+    return 0;
+}
+
 
 // compose an inner record given an api record with null indicator
 //   inner record format:
@@ -172,24 +223,12 @@ RC RecordBasedFileManager::composeInnerRecord(const vector<Attribute> &recordDes
                     int varCharLen = *(int*)((char*)data + dataOffset);
                     memcpy((char*)tmpRecord + recordOffset, (char*)data + dataOffset, sizeof(int) + varCharLen);
 
-                    if (DEBUG) {
-                        printf("fieldIndex:%d\n", fieldIndex);
-                        string name((char*)data + dataOffset, sizeof(int) + varCharLen);
-                        printf("name:%s\n", name.c_str());
-                    }
-
                     // move offset in data and record for next field
                     dataOffset += sizeof(int) + varCharLen;
                     recordOffset += sizeof(int) + varCharLen;
 
                 } else {
                     memcpy((char*)tmpRecord + recordOffset, (char*)data + dataOffset, sizeof(int));
-
-                    if (DEBUG) {
-                        printf("fieldIndex:%d\n", fieldIndex);
-                        int tableid = *(int*)((char*)tmpRecord + recordOffset);
-                        printf("table-id:%d\n", tableid);
-                    }
 
                     dataOffset += sizeof(int);
                     recordOffset += sizeof(int);
@@ -202,7 +241,6 @@ RC RecordBasedFileManager::composeInnerRecord(const vector<Attribute> &recordDes
     }
 
     size = recordOffset;
-    printf("compose inner record done \n");
     return 0;
 }
 

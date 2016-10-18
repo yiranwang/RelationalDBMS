@@ -9,8 +9,6 @@
 
 using namespace std;
 
-# define DEBUG 1
-
 # define RM_EOF (-1)  // end of a scan operator
 const string TABLES_TABLE_NAME = "Tables";
 const string TABLES_FILE_NAME = "Tables";
@@ -50,8 +48,8 @@ public:
 
     vector<Attribute> columnRecordDescriptor;
 
-    //count the number of tables that have been created
-    int countTableNumber;
+    // the total number of tables created
+    int tableCount;
 
    
     // ======= start of self defined functions =====
