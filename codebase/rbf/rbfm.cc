@@ -340,60 +340,6 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
 }
 
 
-RC RecordBasedFileManager::readAttributeFromRecord(const vector<Attribute> &recordDescriptor, void *record, 
-        const int conditionAttrIndex, void *data) {
-
-    // find the offset for the desired attribute
-    short attrOffset = *(short*)((char*)record + (1 + conditionAttrIndex) * sizeof(short));
-    if (recordDescriptor[conditionAttrIndex].type == TypeVarChar) {
-        int varCharLen = *(int*)((char*)record + attrOffset);
-        memcpy(data, (char*)record + attrOffset + sizeof(int), varCharLen);
-        ((char*)data)[varCharLen] = '\0';
-    } else {
-        memcpy(data, (char*)record + attrOffset, sizeof(int));
-    }
-    return 0;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

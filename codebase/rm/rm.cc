@@ -479,7 +479,7 @@ RC RelationManager::readAttribute(const string &tableName, const RID &rid, const
 
 
     // read out the attribute from the target record    
-    if (rbfm->readAttributeFromRecord(recordDescriptor, targetInnerRecord, conditionAttrIndex, data) < 0) {
+    if (rbfm->readAttributeFromInnerRecord(recordDescriptor, targetInnerRecord, conditionAttrIndex, data) < 0) {
         printf("Error in readAttributeFromRecord\n");
         return -1;
     }

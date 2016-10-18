@@ -310,6 +310,55 @@ RC RecordBasedFileManager::composeApiTuple(const vector<Attribute> &recordDescri
 
 
 
+RC RecordBasedFileManager::readAttributeFromInnerRecord(const vector<Attribute> &recordDescriptor, void *innerRecord, 
+        const int conditionAttrIndex, void *data) {
+
+    // find the offset for the desired attribute
+    short attrOffset = *(short*)((char*)innerRecord + (1 + conditionAttrIndex) * sizeof(short));
+    if (recordDescriptor[conditionAttrIndex].type == TypeVarChar) {
+        int varCharLen = *(int*)((char*)innerRecord + attrOffset);
+        memcpy(data, (char*)innerRecord + attrOffset + sizeof(int), varCharLen);
+        ((char*)data)[varCharLen] = '\0';
+    } else {
+        memcpy(data, (char*)innerRecord + attrOffset, sizeof(int));
+    }
+    return 0;
+}
+
+
+
+void RecordBasedFileManager::printInnerRecord(const vector<Attribute> &recordDescriptor, void *innerRecord) {
+    int fieldCount = recordDescriptor.size();
+    int offset = (fieldCount + 1) * sizeof(short);
+    for (int i = 0; i < fieldCount; i++) {
+        printf("%s\t", recordDescriptor[i].name.c_str());
+        if (*(short*)((char*)innerRecord + (1 + i) * sizeof(short)) == -1) {
+            printf("NULL\n");
+        }
+        switch(recordDescriptor[i].type) {
+            case TypeVarChar: {
+                int varCharLength = *(int*)((char*)innerRecord + offset);
+                char varChar[varCharLength + 1];
+                getVarCharData(offset + sizeof(int), innerRecord, varChar, varCharLength);
+                offset += varCharLength;
+                printf("%s\n", varChar);
+                break;
+            }
+            case TypeInt: {
+                printf("%d\n", getIntData(offset, innerRecord));
+                break;
+            }
+            case TypeReal: {
+                printf("%.2f\n", getFloatData(offset, innerRecord));
+                break;
+            }
+            default: 
+                printf("\n");
+                break;
+        }
+        offset += sizeof(int);
+    }
+}
 
 
 

@@ -15,8 +15,6 @@ RC RecordBasedFileManager::scan(FileHandle &fileHandle,
       	RBFM_ScanIterator &rbfm_ScanIterator) {
 
 
-	//printf("#######  inside rbfm->scan\n");
-
 	rbfm_ScanIterator.opened = true;
 	rbfm_ScanIterator.fileHandle = fileHandle;
 
@@ -43,23 +41,19 @@ RC RecordBasedFileManager::scan(FileHandle &fileHandle,
 		rbfm_ScanIterator.value = malloc(dataLength);
 		memcpy(rbfm_ScanIterator.value, value, dataLength);
 		//printf("copied data of length %d, which is: %s\n", dataLength, (char*)(rbfm_ScanIterator.value));
-
 	}
 
-	// store record descriptor and projected attributes' index
+	// store record descriptor and projected attributes descriptor and index
 	rbfm_ScanIterator.recordDescriptor = recordDescriptor;
 
 	for (int i = 0; i < attributeNames.size(); i++) {
-		string curAttrName = attributeNames[i];
 		for (int j = 0; j < recordDescriptor.size(); j++) {
-			if (recordDescriptor[j].name.compare(curAttrName) == 0) {
+			if (recordDescriptor[j].name.compare(attributeNames[i]) == 0) {
 				rbfm_ScanIterator.projectedDescriptor.push_back(recordDescriptor[j]);
 				rbfm_ScanIterator.projectedDescriptorIndex.push_back(j);
 			}
 		}
-
 	}
-
     return 0;
 }
 
@@ -81,7 +75,6 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
 		return RBFM_EOF;
 	}
 
-
 	// read out the page
 	Page *page = new Page;
 	fileHandle.readPage(nextRid.pageNum, page);
@@ -89,7 +82,7 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
 
 	// case 2: invalid slotNum
 	if (nextRid.slotNum > (short)slotCount) {
-		printf("nextRid.slotNum:%d >= slotCount:%d\nSo record to be read does not exist\n", nextRid.slotNum, slotCount);
+		//printf("nextRid.slotNum:%d >= slotCount:%d\nSo record to be read does not exist\n", nextRid.slotNum, slotCount);
 		return -1;
 	}
 
@@ -100,6 +93,7 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
 		free(page);
 		return getNextRecord(rid, data);
 	}
+
 
 	// case 4: previous record is not the last record on its page, we continue on this page
 	Slot targetSlot = {};
@@ -120,31 +114,14 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
 	// read out the record
 	void *targetInnerRecord = malloc(PAGE_SIZE);
 	memset(targetInnerRecord, 0, PAGE_SIZE);
+
 	rbfm->readRecordFromPage(page, targetSlot.offset, targetSlot.length, targetInnerRecord);
 
-
-	//printf("====== Scan Iterator: The recordDescriptor is:\n");
-	//for (int i = 0; i < projectedDescriptor.size(); i++) {
-	//	printf("%d: %s\t", i, projectedDescriptor[i].name.c_str());
-	//}
-	//printf("\nThe record may contain desired tuple is from RID(%d, %d), offset: %d, length: %d\n", nextRid.pageNum, nextRid.slotNum, targetSlot.offset, targetSlot.length);
-
-	//printf("nullByte is %d\n", ((char*)targetInnerRecord)[0]);
-	//printf("table-ID is %d\n", *(int*)((char*)targetInnerRecord + 1));
-	//printf("This record is like this:\n%s\n", (char*)targetInnerRecord);
-
-	printf("Next record, Formal format:\n");
-	rbfm->printRecord(recordDescriptor, targetInnerRecord);
-
-	// read out the attribute data
-	// case 4.2.1: a NULL field is encountered, skip it
-
-
-
-
+	printf("The record being examined is:\n");
+	rbfm->printInnerRecord(recordDescriptor, targetInnerRecord);
 	Attribute conditionAttr = recordDescriptor[conditionAttrIndex];
 	void *attributeData = malloc(PAGE_SIZE);
-	if (rbfm->readAttributeFromRecord(recordDescriptor, targetInnerRecord, conditionAttrIndex, attributeData) < 0) {
+	if (rbfm->readAttributeFromInnerRecord(recordDescriptor, targetInnerRecord, conditionAttrIndex, attributeData) < 0) {
 		//printf("failed readAttribute: %s\n", conditionAttr.name.c_str());
 		free(page);
 		free(targetInnerRecord);
@@ -167,10 +144,6 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
 
 	short tupleSize = 0;
 	rbfm->composeApiTuple(recordDescriptor, projectedDescriptorIndex, targetInnerRecord, data, tupleSize);
-
-	
-	//printf("The tuple returned by iterator is:\n");
-	//rbfm->printRecord(projectedDescriptor, data);
 
 	rid.pageNum = nextRid.pageNum;
 	rid.slotNum = nextRid.slotNum;
