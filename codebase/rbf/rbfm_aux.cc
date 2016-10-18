@@ -130,6 +130,9 @@ RC RecordBasedFileManager::findInsertLocation(FileHandle &fileHandle, const shor
         rid.slotNum = curHeader.slotCount;
     }
     offset = curHeader.freeSpaceOffset;
+
+
+    printf("Location found:RID(%d, %d)\n", rid.pageNum, rid.slotNum);
     return 0;
 }
 

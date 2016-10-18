@@ -117,8 +117,8 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
 
 	rbfm->readRecordFromPage(page, targetSlot.offset, targetSlot.length, targetInnerRecord);
 
-	printf("The record being examined is:\n");
-	rbfm->printInnerRecord(recordDescriptor, targetInnerRecord);
+	//printf("The inner record being examined is:\n");
+	//rbfm->printInnerRecord(recordDescriptor, targetInnerRecord);
 	Attribute conditionAttr = recordDescriptor[conditionAttrIndex];
 	void *attributeData = malloc(PAGE_SIZE);
 	if (rbfm->readAttributeFromInnerRecord(recordDescriptor, targetInnerRecord, conditionAttrIndex, attributeData) < 0) {
@@ -145,6 +145,12 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
 	short tupleSize = 0;
 	rbfm->composeApiTuple(recordDescriptor, projectedDescriptorIndex, targetInnerRecord, data, tupleSize);
 
+	printf("Condition met, the tuple is from this record at RID(%d, %d):\n", nextRid.pageNum, nextRid.slotNum);
+	rbfm->printInnerRecord(recordDescriptor, targetInnerRecord);
+
+	printf("Composed tuple is:\n");
+	rbfm->printRecord(projectedDescriptor, data);
+
 	rid.pageNum = nextRid.pageNum;
 	rid.slotNum = nextRid.slotNum;
 	free(page);
@@ -158,6 +164,8 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
 
 
 RC RBFM_ScanIterator::close() { 
+	nextRid.pageNum = 0;
+    nextRid.slotNum = 0;
 	opened = false;
 	op = NO_OP;
 	conditionAttrIndex = -1;
