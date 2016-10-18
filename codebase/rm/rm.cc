@@ -316,7 +316,7 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
     attributeNames.push_back("column-length");
     
     // TODO: construct attribute with position
-    // attributeNames.push_back("column-position");
+    attributeNames.push_back("column-position");
     
 
     FileHandle fileHandle;
@@ -334,16 +334,19 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
 
     void *recordData = malloc(PAGE_SIZE);
 
-    Attribute attri;
+    
     int attriLength;
     char* attriName = (char*)malloc(51);
     int attriNameLength;
+    int position;
     AttrType attriType;
     int offset = 0;
-    
+
+    vector<AttributeWithPosition> attrWithPositions;
+    AttributeWithPosition attrWithPosition;
 
     while (rbfm_ScanIterator.getNextRecord(rid, recordData) != -1) {
-
+        Attribute attri;
         offset = 1;
 
         memcpy(&attriNameLength, (char*)recordData + offset, sizeof(int));
@@ -358,13 +361,23 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
         memcpy(&attriLength, (char*)recordData + offset, sizeof(int));
         offset += sizeof(int);
 
+        memcpy(&position, (char*)recordData + offset, sizeof(int));
+        offset += sizeof(int);
+
         attriName[attriNameLength] = '\0';
         attri.name = attriName;
         attri.type = attriType;
         attri.length = attriLength;
-        attrs.push_back(attri);
+
+        attrWithPosition = {.attribute = attri, .position = position};
+        attrWithPositions.push_back(attrWithPosition);
     }
 
+    sort(attrWithPositions.begin(), attrWithPositions.end(), CompLess());
+
+    for (int i = 0; i < attrWithPositions.size(); i++) {
+        attrs.push_back(attrWithPositions[i].attribute);
+    }
 
     rbfm_ScanIterator.close();
 

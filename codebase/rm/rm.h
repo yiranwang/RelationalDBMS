@@ -15,6 +15,21 @@ const string TABLES_FILE_NAME = "Tables";
 const string COLUMNS_TABLE_NAME = "Columns";
 const string COLUMNS_FILE_NAME = "Columns";
 
+typedef struct
+{
+    Attribute attribute;
+    int position;
+} AttributeWithPosition;
+
+//increasing comparator for getAttribute
+class CompLess { 
+public: 
+    bool operator()(const AttributeWithPosition& attr1, const AttributeWithPosition attr2) { 
+        return attr1.position < attr2.position; 
+    
+    }
+};
+
 
 // RM_ScanIterator is an iteratr to go through tuples
 class RM_ScanIterator {
