@@ -303,13 +303,14 @@ RC RelationManager::deleteTable(const string &tableName) {
     void *tupleDeleted = malloc(PAGE_SIZE);
 
 
-    //search in "Tables" to find the corresponding tuples according to table-id
+    //search in "Columns" to find the tuples where table-id = tableId
     scan("Columns", "table-id", EQ_OP, &tableId, attributeNames, rm_ScanIterator);
     while (rm_ScanIterator.getNextTuple(rid, tupleDeleted) != -1) {
+        printf("deleting RID(%d, %d) @Columns...\n", rid.pageNum, rid.slotNum);
         if (deleteTuple("Columns", rid) < 0) {
             return -1;
         }
-        printf("deleted RID(%d, %d) from Columns\n", rid.pageNum, rid.slotNum);
+        printf("delete RID(%d, %d) from Columns done!\n", rid.pageNum, rid.slotNum);
     }
     rm_ScanIterator.close();
     free(tupleDeleted);

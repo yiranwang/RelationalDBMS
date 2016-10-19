@@ -199,9 +199,6 @@ RC RecordBasedFileManager::printRecord(const vector<Attribute> &recordDescriptor
 
 RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid) {
 
-    printf("inside rbfm::deleteRecord\n");
-
-    
     // read the page
     Page *page = new Page;
     fileHandle.readPage(rid.pageNum, page);
@@ -217,14 +214,14 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
     }
     // case 2: record is redirected to another page                                                 
     // because after being updated, the current page cannot hold it                                 
-    else if (slot.length < 0) {
+    if (slot.length < 0) {
         RID nextRid = *(RID*)((char*)page + slot.offset);                                           
         delete page;
         return deleteRecord(fileHandle, recordDescriptor, nextRid);
     }
 
     // ============ normal case ================
-
+   
     // case 3: slot is valid, record-to-be-deleted is on this page
     short lastSlotNum = page->header.slotCount - 1; 
     // if deleting the very last record, no need to shift anything
@@ -248,10 +245,9 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
     page->header.freeSpaceOffset -= slot.length;
     // set slot.offset to -1 to indicate that it's deleted
     slot.offset = -1;
-    // write changes of the page to file
+    // write the updated slot to page and updated page back to file
     writeSlotToPage(page, rid.slotNum, slot);
     if(fileHandle.writePage(rid.pageNum, page) < 0) {
-
         return -1;
     }
     delete page; 
