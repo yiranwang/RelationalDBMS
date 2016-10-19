@@ -2,6 +2,10 @@
 
 int main()
 {
+
+  string str1 = "tbl_employee";
+  string str2 = "tbl_employee2";
+
   // By executing this script, the following tables including the system tables will be removed and constructed again.
 
   // Before executing rmtest_xx, you need to make sure that this script work properly.
@@ -11,17 +15,14 @@ int main()
   // If this is the first time, it will generate an error. It's OK and we will ignore that.
   RC rc = rm->deleteCatalog();
 
-
   rc = rm->createCatalog();
   assert (rc == success && "Creating the Catalog should not fail.");
-
 
   // Delete the actual file and create Table tbl_employee
   remove("tbl_employee");
 
   rc = createTable("tbl_employee");
   assert (rc == success && "Creating a table should not fail.");
-
 
   // Delete the actual file and create Table tbl_employee
   remove("tbl_employee2");

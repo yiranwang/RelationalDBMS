@@ -41,10 +41,7 @@ RC PagedFileManager::createFile(const string &fileName)
 
 RC PagedFileManager::destroyFile(const string &fileName)
 {
-    int rc = remove(fileName.c_str());
-    if (DEBUG) {
-        perror("Error in pfm::destroyFile");
-    }
+    int rc = unlink(fileName.c_str());
     return rc;
 }
 

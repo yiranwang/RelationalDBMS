@@ -12,7 +12,8 @@ RC RecordBasedFileManager::scan(FileHandle &fileHandle,
 		const CompOp compOp,                  // comparision type such as "<" and "="
       	const void *value,                    // used in the comparison
       	const vector<string> &attributeNames, // a list of projected attributes
-      	RBFM_ScanIterator &rbfm_ScanIterator) {
+      	RBFM_ScanIterator &rbfm_ScanIterator) 
+{
 
 
 	rbfm_ScanIterator.opened = true;
@@ -71,7 +72,7 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
 	// case 1: pageNum >= totalPageNum
 	unsigned totalPageNum = fileHandle.getNumberOfPages();
 	if (nextRid.pageNum >= totalPageNum) {
-		printf("RBFM_EOF reached!\n");
+		//printf("RBFM_EOF reached!\n");
 		return RBFM_EOF;
 	}
 
@@ -117,12 +118,12 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
 
 	rbfm->readRecordFromPage(page, targetSlot.offset, targetSlot.length, targetInnerRecord);
 
-	//printf("The inner record being examined is:\n");
+	//printf("inside rbfm_ScanIterator.getNextRecord, the inner record being examined is:\n");
 	//rbfm->printInnerRecord(recordDescriptor, targetInnerRecord);
+
 	Attribute conditionAttr = recordDescriptor[conditionAttrIndex];
 	void *attributeData = malloc(PAGE_SIZE);
 	if (rbfm->readAttributeFromInnerRecord(recordDescriptor, targetInnerRecord, conditionAttrIndex, attributeData) < 0) {
-		//printf("failed readAttribute: %s\n", conditionAttr.name.c_str());
 		free(page);
 		free(targetInnerRecord);
 		free(attributeData);
@@ -131,8 +132,9 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
 	}
 
 
-	// case 4.2.2: condition not met, skip this record
-	if (!opCompare(attributeData, value, op, conditionAttr.type)) {
+	// attributeData's 1st byte is nullIndicator: 10000000 means it's NULL
+	// case 4.2.2: this attribute is NULL or condition not met, skip this record
+	if (*(unsigned char*)attributeData == 128 || !opCompare((char*)attributeData + 1, value, op, conditionAttr.type)) {
 		free(page);
 		free(targetInnerRecord);
 		free(attributeData);
@@ -145,11 +147,22 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
 	short tupleSize = 0;
 	rbfm->composeApiTuple(recordDescriptor, projectedDescriptorIndex, targetInnerRecord, data, tupleSize);
 
-	printf("Condition met, the tuple is from this record at RID(%d, %d):\n", nextRid.pageNum, nextRid.slotNum);
-	rbfm->printInnerRecord(recordDescriptor, targetInnerRecord);
 
-	printf("Composed tuple is:\n");
-	rbfm->printRecord(projectedDescriptor, data);
+	/*
+	printf("\n[Condition Met] the tuple is from this record at RID(%d, %d):\n", nextRid.pageNum, nextRid.slotNum);
+	printf("current recordDescriptor:\t[");
+	for (int i = 0; i < recordDescriptor.size(); i++) {
+		printf("%s\t", recordDescriptor[i].name.c_str());
+	}
+	printf("]\n");
+
+
+	rbfm->printInnerRecord(recordDescriptor, targetInnerRecord);
+	printf("\n");
+	*/
+
+	//printf("Composed tuple is:\n");
+	//rbfm->printRecord(projectedDescriptor, data);
 
 	rid.pageNum = nextRid.pageNum;
 	rid.slotNum = nextRid.slotNum;
@@ -188,7 +201,7 @@ bool RBFM_ScanIterator::opCompare(void* ref1, void* ref2, CompOp op, AttrType ty
     	return false;
     }
     if (type == TypeVarChar) {
-    	printf("comparing %s and %s\n", (char*)ref1, (char*)ref2);
+    	//printf("comparing %s and %s\n", (char*)ref1, (char*)ref2);
 		string str1((char*)ref1);
 		string str2((char*)ref2);
 		int res = str1.compare(str2);
@@ -206,7 +219,7 @@ bool RBFM_ScanIterator::opCompare(void* ref1, void* ref2, CompOp op, AttrType ty
         int int1 = *(int*)ref1;
         int int2 = *(int*)ref2;
         int res = int1 - int2;
-        printf("comparing %d and %d\n", int1, int2);
+        //printf("comparing %d and %d\n", int1, int2);
         switch (op) {
 			case EQ_OP: return res == 0;
         	case LT_OP: return res < 0;
@@ -222,7 +235,7 @@ bool RBFM_ScanIterator::opCompare(void* ref1, void* ref2, CompOp op, AttrType ty
         float f1 = *(float*)ref1;
         float f2 = *(float*)ref2;
         float res = f1 - f2;
-        printf("comparing %f and %f\n", f1, f2);
+        //printf("comparing %f and %f\n", f1, f2);
         switch (op) {
 			case EQ_OP: return res == 0.0;
         	case LT_OP: return res < 0.0;

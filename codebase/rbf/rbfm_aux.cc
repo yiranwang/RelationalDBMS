@@ -25,8 +25,7 @@ float RecordBasedFileManager::getFloatData(int offset, const void* data) {
 }
 
 
-RC RecordBasedFileManager::getVarCharData(int offset, const void* data, 
-        char* varChar, const int varCharLength) {
+RC RecordBasedFileManager::getVarCharData(int offset, const void* data, char* varChar, const int varCharLength) {
     memcpy(varChar, (char *)data + offset, varCharLength);
     varChar[varCharLength] = '\0';
     return 0;
@@ -38,8 +37,7 @@ void RecordBasedFileManager::readSlotFromPage(Page *page, const short slotNum, S
 }
 
 
-void RecordBasedFileManager::writeSlotToPage(Page *page, const short slotNum, 
-        const Slot &slot) {
+void RecordBasedFileManager::writeSlotToPage(Page *page, const short slotNum, const Slot &slot) {
     memcpy((char*)page + PAGE_SIZE - (slotNum + 1) * sizeof(Slot), 
             &slot, sizeof(Slot));
     page->header.slotCount += 1;
@@ -52,8 +50,7 @@ void RecordBasedFileManager::readRecordFromPage(Page *page, const short offset, 
 }
 
 
-void RecordBasedFileManager::insertRecordToPage(Page *page, const short offset, const void* record, 
-        const short recordSize) {
+void RecordBasedFileManager::insertRecordToPage(Page *page, const short offset, const void* record, const short recordSize) {
     memcpy((char*)page + offset, record, recordSize);
     page->header.recordCount += 1;
     page->header.freeSpace -= recordSize;
@@ -132,13 +129,12 @@ RC RecordBasedFileManager::findInsertLocation(FileHandle &fileHandle, const shor
     offset = curHeader.freeSpaceOffset;
 
 
-    printf("Location found:RID(%d, %d)\n", rid.pageNum, rid.slotNum);
+    //printf("Location found:RID(%d, %d)\n", rid.pageNum, rid.slotNum);
     return 0;
 }
 
 
-RC RecordBasedFileManager::readInnerRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, 
-        const RID &rid, const void *data) {
+RC RecordBasedFileManager::readInnerRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, void *data) {
 
     // validate pageNum
     unsigned totalPageNum = fileHandle.getNumberOfPages();
@@ -180,22 +176,23 @@ RC RecordBasedFileManager::readInnerRecord(FileHandle &fileHandle, const vector<
         return readInnerRecord(fileHandle, recordDescriptor, targetRid, data);
     }
 
+    //printf("Inside readInnerRecord, the record is on this page!\n");
     // case 3: the record is on this page
     // read out the target record
-    void *targetInnerRecord = malloc(PAGE_SIZE);
-    readRecordFromPage(page, targetSlot.offset, targetSlot.length, targetInnerRecord);
+    readRecordFromPage(page, targetSlot.offset, targetSlot.length, data);
     free(page);
     return 0;
 }
 
 
-// compose an inner record given an api record with null indicator
+/* compose an inner record (tmpRecord) given an api record (data) with null indicator
 //   inner record format:
 //      short: fieldCount
 //      short [filedCount]: field offset, -1 if it's null
 //      field values
-RC RecordBasedFileManager::composeInnerRecord(const vector<Attribute> &recordDescriptor, const void *data, 
-    void *tmpRecord, short &size) {
+*/
+
+RC RecordBasedFileManager::composeInnerRecord(const vector<Attribute> &recordDescriptor, const void *data, void *tmpRecord, short &size) {
 
     bool nullBit = false;
     int fieldCount = recordDescriptor.size();
@@ -249,8 +246,7 @@ RC RecordBasedFileManager::composeInnerRecord(const vector<Attribute> &recordDes
 
 
 
-RC RecordBasedFileManager::composeApiTuple(const vector<Attribute> &recordDescriptor, vector<int> &projectedDescriptor, 
-        void *innerRecord, void *tuple, short &size) {
+RC RecordBasedFileManager::composeApiTuple(const vector<Attribute> &recordDescriptor, vector<int> &projectedDescriptor, void *innerRecord, void *tuple, short &size) {
 
     int fieldCount = projectedDescriptor.size();
     int nullIndicatorSize = getNullIndicatorSize(fieldCount);
@@ -313,53 +309,75 @@ RC RecordBasedFileManager::composeApiTuple(const vector<Attribute> &recordDescri
 
 
 
-RC RecordBasedFileManager::readAttributeFromInnerRecord(const vector<Attribute> &recordDescriptor, void *innerRecord, 
-        const int conditionAttrIndex, void *data) {
+// data will have 1 nullIndicator byte for this only one attribute
+RC RecordBasedFileManager::readAttributeFromInnerRecord(const vector<Attribute> &recordDescriptor, void *innerRecord, const int targetAttrIndex, void *data) {
 
+    // initialize nullIndicator byte as: 00000000
+    memset(data, 0, 1);
+   
     // find the offset for the desired attribute
-    short attrOffset = *(short*)((char*)innerRecord + (1 + conditionAttrIndex) * sizeof(short));
-    if (recordDescriptor[conditionAttrIndex].type == TypeVarChar) {
+    short attrOffset = *(short*)((char*)innerRecord + (1 + targetAttrIndex) * sizeof(short));
+    if (attrOffset < 0) {
+        // set the first bit in the nullIndicator byte: 10000000 = 128
+        *(unsigned char*) data = 128;
+        printf("The attribute %s has a value of NULL\n", recordDescriptor[targetAttrIndex].name.c_str());
+        return -1;
+    }
+    if (recordDescriptor[targetAttrIndex].type == TypeVarChar) {
         int varCharLen = *(int*)((char*)innerRecord + attrOffset);
-        memcpy(data, (char*)innerRecord + attrOffset + sizeof(int), varCharLen);
-        ((char*)data)[varCharLen] = '\0';
+        memcpy((char*)data + 1, (char*)innerRecord + attrOffset + sizeof(int), varCharLen);
+        ((char*)data)[varCharLen + 1] = '\0';
+        //printf("Read off %s = %s\n", recordDescriptor[targetAttrIndex].name.c_str(), ((char*)data + 1));
+    } 
+    else if (recordDescriptor[targetAttrIndex].type == TypeInt) {
+        memcpy((char*)data + 1, (char*)innerRecord + attrOffset, sizeof(int));
+        //printf("Read off %s = %d\n", recordDescriptor[targetAttrIndex].name.c_str(), *(int*)((char*)data + 1));
     } else {
-        memcpy(data, (char*)innerRecord + attrOffset, sizeof(int));
+        memcpy((char*)data + 1, (char*)innerRecord + attrOffset, sizeof(float));
+        //printf("Read off %s = %f\n", recordDescriptor[targetAttrIndex].name.c_str(), *(float*)((char*)data + 1));
     }
     return 0;
 }
 
 
-
+// print the inner record, used for debug purpose
 void RecordBasedFileManager::printInnerRecord(const vector<Attribute> &recordDescriptor, void *innerRecord) {
-    int fieldCount = recordDescriptor.size();
-    int offset = (fieldCount + 1) * sizeof(short);
+    short fieldCount = *(short*)innerRecord;;
+
+    if (fieldCount != (short)recordDescriptor.size()) {
+        printf("Error in printInnerRecord: fieldCount = %d from this innerRecord doesn't match recordDescriptor.size() = %lu!\n", fieldCount, recordDescriptor.size());
+        return;
+    }
+
+    printf("%d attributes in this records\n", *(short*)innerRecord);
     for (int i = 0; i < fieldCount; i++) {
-        printf("%s\t", recordDescriptor[i].name.c_str());
-        if (*(short*)((char*)innerRecord + (1 + i) * sizeof(short)) == -1) {
+        printf("@offset: %d;\t%s\t", *(short*)((char*)innerRecord + sizeof(short) * (1 + i)), recordDescriptor[i].name.c_str());
+
+        short fieldOffset = *(short*)((char*)innerRecord + (1 + i) * sizeof(short));
+        if (fieldOffset == -1) {
             printf("NULL\n");
+            continue;
         }
         switch(recordDescriptor[i].type) {
             case TypeVarChar: {
-                int varCharLength = *(int*)((char*)innerRecord + offset);
+                int varCharLength = *(int*)((char*)innerRecord + fieldOffset);
                 char varChar[varCharLength + 1];
-                getVarCharData(offset + sizeof(int), innerRecord, varChar, varCharLength);
-                offset += varCharLength;
+                getVarCharData(fieldOffset + sizeof(int), innerRecord, varChar, varCharLength);
                 printf("%s\n", varChar);
                 break;
             }
             case TypeInt: {
-                printf("%d\n", getIntData(offset, innerRecord));
+                printf("%d\n", getIntData(fieldOffset, innerRecord));
                 break;
             }
             case TypeReal: {
-                printf("%.2f\n", getFloatData(offset, innerRecord));
+                printf("%.2f\n", getFloatData(fieldOffset, innerRecord));
                 break;
             }
             default: 
                 printf("\n");
                 break;
         }
-        offset += sizeof(int);
     }
 }
 

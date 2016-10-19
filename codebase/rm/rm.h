@@ -15,8 +15,7 @@ const string TABLES_FILE_NAME = "Tables";
 const string COLUMNS_TABLE_NAME = "Columns";
 const string COLUMNS_FILE_NAME = "Columns";
 
-typedef struct
-{
+typedef struct{
     Attribute attribute;
     int position;
 } AttributeWithPosition;
@@ -26,7 +25,6 @@ class CompLess {
 public: 
     bool operator()(const AttributeWithPosition& attr1, const AttributeWithPosition attr2) { 
         return attr1.position < attr2.position; 
-    
     }
 };
 

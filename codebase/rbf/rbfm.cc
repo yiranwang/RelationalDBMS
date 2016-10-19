@@ -38,8 +38,7 @@ RC RecordBasedFileManager::closeFile(FileHandle &fileHandle) {
 }
 
 
-RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, 
-        const void *data, RID &rid) {
+RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const void *data, RID &rid) {
 
     short insertOffset = -1;  // location on the page to insert the record
     short recordSize = -1;
@@ -76,8 +75,7 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
 }
 
 
-RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, 
-        const RID &rid, void *data) {
+RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, void *data) {
 
     // read the page
     Page *page = new Page;
@@ -119,8 +117,9 @@ RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attri
     // write inner record out to data in Api format
     int bitPos = CHAR_BIT - 1;
     for (int fieldIndex = 0; fieldIndex < fieldCount; fieldIndex++) {
-        short fieldOffset = 
-            *(short *)(innerRecord + (fieldIndex + 1) * sizeof(short));
+        short fieldOffset = *(short *)(innerRecord + (fieldIndex + 1) * sizeof(short));
+
+        // check if this field is NULL
         if (fieldOffset >= 0) {
             Attribute fieldAttr = recordDescriptor[fieldIndex];     
             if (fieldAttr.type == TypeVarChar) {
@@ -200,6 +199,9 @@ RC RecordBasedFileManager::printRecord(const vector<Attribute> &recordDescriptor
 
 RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid) {
 
+    printf("inside rbfm::deleteRecord\n");
+
+    
     // read the page
     Page *page = new Page;
     fileHandle.readPage(rid.pageNum, page);
@@ -220,7 +222,10 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
         delete page;
         return deleteRecord(fileHandle, recordDescriptor, nextRid);
     }
-    // case 3: slot is valid, record-to-be-deleted is in this page
+
+    // ============ normal case ================
+
+    // case 3: slot is valid, record-to-be-deleted is on this page
     short lastSlotNum = page->header.slotCount - 1; 
     // if deleting the very last record, no need to shift anything
     // otherwise shift every following record to the left
@@ -228,8 +233,7 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
         // get the size of the rest records first
         int restSize = page->header.freeSpaceOffset - slot.offset - slot.length;  
         // shift the rest records to the LEFT by slot.length
-        shiftBytes((char*)page + slot.offset + slot.length, 
-                restSize, 0 - slot.length);
+        shiftBytes((char*)page + slot.offset + slot.length, restSize, 0 - slot.length);
     
         // adjust offset of the rest records' slots
         for (int slotIndex = rid.slotNum + 1; slotIndex < page->header.slotCount; slotIndex++) {
@@ -254,8 +258,7 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
     return 0;
 }
 
-RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, 
-        const void *data, const RID &rid) {
+RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const void *data, const RID &rid) {
 
     // read the page
     Page *page = new Page;

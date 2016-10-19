@@ -25,6 +25,6 @@ int main()
 {
     // Get Attributes
     RC rcmain = TEST_RM_0("tbl_employee");
-    //RC rcmain = TEST_RM_0("Tables");
+
     return rcmain;
 }

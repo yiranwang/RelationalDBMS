@@ -75,7 +75,7 @@ public:
 
     void readRecordFromPage(Page *page, const short offset, const short recordSize, void *data);
 
-    RC readInnerRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, const void *data);
+    RC readInnerRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, void *data);
 
     void insertRecordToPage(Page *page, const short offset, const void *record, const short recordSize);
 
@@ -140,6 +140,7 @@ RC deleteRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescripto
 
 // Assume the RID does not change after an update
 RC updateRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const void *data, const RID &rid);
+
 
 RC readAttributeFromInnerRecord(const vector<Attribute> &recordDescriptor, void *innerRecord, const int conditionAttrIndex, void *data);
 
