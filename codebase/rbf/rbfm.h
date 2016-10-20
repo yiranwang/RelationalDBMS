@@ -142,7 +142,7 @@ RC deleteRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescripto
 RC updateRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const void *data, const RID &rid);
 
 
-RC readAttributeFromInnerRecord(const vector<Attribute> &recordDescriptor, void *innerRecord, const int conditionAttrIndex, void *data);
+void readAttributeFromInnerRecord(const vector<Attribute> &recordDescriptor, void *innerRecord, const int conditionAttrIndex, void *data);
 
 // Scan returns an iterator to allow the caller to go through the results one by one. 
 RC scan(FileHandle &fileHandle,

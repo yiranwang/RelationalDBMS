@@ -310,20 +310,21 @@ RC RecordBasedFileManager::composeApiTuple(const vector<Attribute> &recordDescri
 
 
 // data will have 1 nullIndicator byte for this only one attribute
-RC RecordBasedFileManager::readAttributeFromInnerRecord(const vector<Attribute> &recordDescriptor, void *innerRecord, const int targetAttrIndex, void *data) {
+void RecordBasedFileManager::readAttributeFromInnerRecord(const vector<Attribute> &recordDescriptor, void *innerRecord, const int targetAttrIndex, void *data) {
 
     // initialize nullIndicator byte as: 00000000
     memset(data, 0, 1);
    
     // find the offset for the desired attribute
     short attrOffset = *(short*)((char*)innerRecord + (1 + targetAttrIndex) * sizeof(short));
+
+    // if attribute's value is NULL
     if (attrOffset < 0) {
         // set the first bit in the nullIndicator byte: 10000000 = 128
         *(unsigned char*) data = 128;
-        printf("The attribute %s has a value of NULL\n", recordDescriptor[targetAttrIndex].name.c_str());
-        return -1;
+        //printf("The attribute %s has a value of NULL\n", recordDescriptor[targetAttrIndex].name.c_str());
     }
-    if (recordDescriptor[targetAttrIndex].type == TypeVarChar) {
+    else if (recordDescriptor[targetAttrIndex].type == TypeVarChar) {
         int varCharLen = *(int*)((char*)innerRecord + attrOffset);
         memcpy((char*)data + 1, (char*)innerRecord + attrOffset + sizeof(int), varCharLen);
         ((char*)data)[varCharLen + 1] = '\0';
@@ -336,7 +337,6 @@ RC RecordBasedFileManager::readAttributeFromInnerRecord(const vector<Attribute> 
         memcpy((char*)data + 1, (char*)innerRecord + attrOffset, sizeof(float));
         //printf("Read off %s = %f\n", recordDescriptor[targetAttrIndex].name.c_str(), *(float*)((char*)data + 1));
     }
-    return 0;
 }
 
 

@@ -112,14 +112,12 @@ RC RelationManager::createCatalog() {
         return -1;
     }
 
-    //printf("Inserted below into Tables:\n");
-    //rbfm->printRecord(tableRecordDescriptor, tmpData);
-
     memset(tmpData, 0, PAGE_SIZE);
     prepareApiTableRecord(2, COLUMNS_TABLE_NAME, COLUMNS_FILE_NAME, tmpData, apiTableRecordSize);
     if (rbfm->insertRecord(tableFileHandle, tableRecordDescriptor, tmpData, dummyRid) < 0) {
         return -1;
     }
+
     if (rbfm->closeFile(tableFileHandle) < 0) {
         return -1;
     }
@@ -147,27 +145,18 @@ RC RelationManager::createCatalog() {
     if (rbfm->insertRecord(columnFileHandle, columnRecordDescriptor, tmpData, dummyRid) < 0) {
         return -1;
     }
-    //printf("table-id is inserted to RID(%d, %d)\n", dummyRid.pageNum, dummyRid.slotNum);
-
-    //printf("Inserted below into Columns:\n");
-    //rbfm->printRecord(columnRecordDescriptor, tmpData);
 
     memset(tmpData, 0, PAGE_SIZE);
     prepareApiColumnRecord(1, "table-name", TypeVarChar, 50, 2, tmpData);
     if (rbfm->insertRecord(columnFileHandle, columnRecordDescriptor, tmpData, dummyRid) < 0) {
         return -1;
     }
-    //printf("table-name is inserted to RID(%d, %d)\n", dummyRid.pageNum, dummyRid.slotNum);
-
 
     memset(tmpData, 0, PAGE_SIZE);
     prepareApiColumnRecord(1, "file-name", TypeVarChar, 50, 3, tmpData);
     if (rbfm->insertRecord(columnFileHandle, columnRecordDescriptor, tmpData, dummyRid) < 0) {
         return -1;
     }
-    //printf("file-name is inserted to RID(%d, %d)\n", dummyRid.pageNum, dummyRid.slotNum);
-
-
 
         // ============== write Columns record descriptor
 
@@ -176,7 +165,6 @@ RC RelationManager::createCatalog() {
     if (rbfm->insertRecord(columnFileHandle, columnRecordDescriptor, tmpData, dummyRid) < 0) {
         return -1;
     }
-    //printf("table-id is inserted to RID(%d, %d)\n", dummyRid.pageNum, dummyRid.slotNum);
 
     memset(tmpData, 0, PAGE_SIZE);
     prepareApiColumnRecord(2, "column-name", TypeVarChar, 50, 2, tmpData);
@@ -281,39 +269,48 @@ RC RelationManager::deleteTable(const string &tableName) {
         return -1;
     }
 
-    printf("table file of %s is deleted, now deleting it from Tables\n", tableName.c_str());
+    printf("table file of %s is deleted, now deleting <id, tableName, fileName> from Tables\n", tableName.c_str());
 
     int tableId;
     RID rid;
     
     getTableIdByTableName(tableId, rid, tableName);
 
-    printf("tableId = %d, location in Tables: RID(%d, %d)\n", tableId, rid.pageNum, rid.slotNum);
+    FileHandle tableFileHandle;
+    rbfm->openFile(TABLES_TABLE_NAME, tableFileHandle);
 
-    if (deleteTuple("Tables", rid) < 0) {
+    if (rbfm->deleteRecord(tableFileHandle, tableRecordDescriptor, rid) < 0) {
+        return -1;
+    }
+    if (rbfm->closeFile(tableFileHandle) < 0) {
         return -1;
     }
 
-    printf("Table info is deleted from Tables, now delete table info in Columns\n");
+    printf("******************************Table info is deleted from Tables, now delete all records where table-id = %d in Columns\n", tableId);
 
 
     vector<string> attributeNames;
     attributeNames.push_back("table-id");
     RM_ScanIterator rm_ScanIterator;
-    void *tupleDeleted = malloc(PAGE_SIZE);
+    void *targetTuple = malloc(PAGE_SIZE);
 
 
     //search in "Columns" to find the tuples where table-id = tableId
-    scan("Columns", "table-id", EQ_OP, &tableId, attributeNames, rm_ScanIterator);
-    while (rm_ScanIterator.getNextTuple(rid, tupleDeleted) != -1) {
+    scan(COLUMNS_TABLE_NAME, "table-id", EQ_OP, &tableId, attributeNames, rm_ScanIterator);
+
+    //printf("rm::scan(Columns, table-id, EQ_OP, &tableId, attributeNames, rm_ScanIterator) done\n");
+
+    while (rm_ScanIterator.getNextTuple(rid, targetTuple) != -1) {
         printf("deleting RID(%d, %d) @Columns...\n", rid.pageNum, rid.slotNum);
-        if (deleteTuple("Columns", rid) < 0) {
+        if (rbfm->deleteRecord(rm_ScanIterator.rbfm_ScanIterator.fileHandle, columnRecordDescriptor, rid) < 0) {
             return -1;
         }
         printf("delete RID(%d, %d) from Columns done!\n", rid.pageNum, rid.slotNum);
     }
+
+    printf("delete records in Colulmns done! close rm_ScanIterator and free targetTuple...\n");
     rm_ScanIterator.close();
-    free(tupleDeleted);
+    free(targetTuple);
 
     return 0;
 }
@@ -322,7 +319,6 @@ RC RelationManager::deleteTable(const string &tableName) {
 // read recordDescriptor out from Columns
 RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &attrs) {
 
-   
     if (tableName.compare(TABLES_TABLE_NAME) == 0) {
         attrs = tableRecordDescriptor;
         return 0;
@@ -331,7 +327,6 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
         attrs = columnRecordDescriptor;
         return 0;
     } 
-
 
     int tableId = 0;
     RID rid;
@@ -348,7 +343,7 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
     FileHandle fileHandle;
 
     if (rbfm->openFile(COLUMNS_FILE_NAME, fileHandle) < 0) {
-        printf("Error in openFile%s\n", COLUMNS_FILE_NAME.c_str());
+        if (DEBUG) printf("Error in openFile%s\n", COLUMNS_FILE_NAME.c_str());
         return -1;
     }
 
@@ -411,30 +406,21 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
     if (rbfm->closeFile(fileHandle) < 0) {
         return -1;
     }
-
-
-    /*printf("getAttributes done\n");
-    printf("the retrieved recordDescriptor is:\n");
-    for (int i = 0; i < attrs.size(); i++) {
-      printf("%s\t", attrs[i].name.c_str());
-    }
-    */
+    
     return 0;
 }
-
-
 
 RC RelationManager::insertTuple(const string &tableName, const void *data, RID &rid) {   
 
     FileHandle fileHandle;
     vector<Attribute> recordDescriptor;
 
+    getAttributes(tableName, recordDescriptor);   
+
     if (rbfm->openFile(tableName, fileHandle) < 0) {
         return -1;
     }
-
-    getAttributes(tableName, recordDescriptor);   
- 
+    
     if (rbfm->insertRecord(fileHandle, recordDescriptor, data, rid) < 0) {
         return -1;
     }
@@ -453,11 +439,11 @@ RC RelationManager::deleteTuple(const string &tableName, const RID &rid) {
     FileHandle fileHandle;
     vector<Attribute> recordDescriptor;
 
+    getAttributes(tableName, recordDescriptor);
+
     if (rbfm->openFile(tableName, fileHandle) < 0) {
         return -1;
     }
-
-    getAttributes(tableName, recordDescriptor);
 
     if (rbfm->deleteRecord(fileHandle, recordDescriptor, rid) < 0) {
         return -1;
@@ -474,11 +460,11 @@ RC RelationManager::updateTuple(const string &tableName, const void *data, const
     FileHandle fileHandle;
     vector<Attribute> recordDescriptor;
 
+    getAttributes(tableName, recordDescriptor);
+
     if (rbfm->openFile(tableName, fileHandle) < 0) {
         return -1;
     }
-
-    getAttributes(tableName, recordDescriptor);
 
     if (rbfm->updateRecord(fileHandle, recordDescriptor, data, rid) < 0) {
         return -1;
@@ -496,11 +482,11 @@ RC RelationManager::readTuple(const string &tableName, const RID &rid, void *dat
     FileHandle fileHandle;
     vector<Attribute> recordDescriptor;
 
+    getAttributes(tableName, recordDescriptor);
+
     if (rbfm->openFile(tableName, fileHandle) < 0) {
         return -1;
     }
-
-    getAttributes(tableName, recordDescriptor);
 
     if (rbfm->readRecord(fileHandle, recordDescriptor, rid, data) < 0) {
         return -1;
@@ -535,42 +521,20 @@ RC RelationManager::readAttribute(const string &tableName, const RID &rid, const
         }
     }
     if (targetAttrIndex == recordDescriptor.size()) {
-        printf("conditionAttribute not found!\n");
+        if(DEBUG) printf("conditionAttribute not found!\n");
         return -1;
     }
-    //printf("attrIndex for %s is %d\n", attributeName.c_str(), targetAttrIndex);
-
-
-
-    /*
-    void *tmpData = malloc(PAGE_SIZE);
-    rbfm->readRecord(fileHandle, recordDescriptor, rid, tmpData);
-    printf("The api record read and printed is:\n");
-    rbfm->printRecord(recordDescriptor, tmpData);
-    free(tmpData);
-    */
 
 
     // read out the inner record
     void *targetInnerRecord = malloc(PAGE_SIZE);
     if(rbfm->readInnerRecord(fileHandle, recordDescriptor, rid, targetInnerRecord) < 0) {
-        printf("Error in readInnerRecord\n");
+        if(DEBUG) printf("Error in readInnerRecord\n");
         return -1;
     }
-
-    //printf("The inner record read and printed is:\n");
-    //rbfm->printInnerRecord(recordDescriptor, targetInnerRecord);               
-
-    // ==== above verified !
-
 
     // read out the attribute from the target inner record given the attrIndex   
-    if (rbfm->readAttributeFromInnerRecord(recordDescriptor, targetInnerRecord, targetAttrIndex, data) < 0) {
-        printf("Error in readAttributeFromInnerRecord\n");
-        return -1;
-    }
-
-    //printf("inside readAttribute, data = %d\n", *(int*)data);
+    rbfm->readAttributeFromInnerRecord(recordDescriptor, targetInnerRecord, targetAttrIndex, data) ;
 
     if (rbfm->closeFile(fileHandle) < 0) {
         return -1;
@@ -586,26 +550,21 @@ RC RelationManager::scan(const string &tableName,
       const vector<string> &attributeNames,
       RM_ScanIterator &rm_ScanIterator)
 {
-    FileHandle fileHandle;
     vector<Attribute> recordDescriptor;
-    RBFM_ScanIterator rbfm_ScanIterator;
-
     getAttributes(tableName, recordDescriptor);
 
+    FileHandle fileHandle;
     if (rbfm->openFile(tableName, fileHandle) < 0) {
         return -1;
     }
 
+    printf("Inside rm::scan. File of %s is opened! fileHandle.fd = %d\n", tableName.c_str(), fileHandle.fd);
+
     if (rbfm->scan(fileHandle, recordDescriptor , conditionAttribute, compOp, value, attributeNames, 
-        rbfm_ScanIterator) < 0) {
+        rm_ScanIterator.rbfm_ScanIterator) < 0) {
         return -1;
     }
-    rm_ScanIterator.rbfm_ScanIterator = rbfm_ScanIterator;
-
-    if (rbfm->closeFile(fileHandle) < 0) {
-        return -1;
-    }
-
+    
     return 0;
 }
 
@@ -620,20 +579,20 @@ void RelationManager::getTableIdByTableName(int &tableId, RID &rid, const string
     //search in "Tables" to find the corresponding table-id of tableName
     FileHandle fileHandle;
     RBFM_ScanIterator rbfm_ScanIterator;
-    rbfm->openFile("Tables", fileHandle);
+    rbfm->openFile(TABLES_FILE_NAME, fileHandle);
     rbfm->scan(fileHandle, tableRecordDescriptor, "table-name", EQ_OP, tableName.c_str(), 
         attributeNames, rbfm_ScanIterator);
 
-    void *innerRecord = malloc(PAGE_SIZE);
+    void *apiTuple = malloc(PAGE_SIZE);
 
-    rbfm_ScanIterator.getNextRecord(rid, innerRecord);
+    rbfm_ScanIterator.getNextRecord(rid, apiTuple);
     //printf("In getTableIdByName. The record containing desired table-id is:\n");
-    //rbfm->printRecord(rbfm_ScanIterator.projectedDescriptor, innerRecord);
+    //rbfm->printRecord(rbfm_ScanIterator.projectedDescriptor, apiTuple);
 
-
-    tableId = *(int*)((char*)innerRecord + 1);
+    // skip the 1st byte, which is the nullIndicate byte
+    tableId = *(int*)((char*)apiTuple + 1);
     rbfm_ScanIterator.close();
-    free(innerRecord);
+    free(apiTuple);
     rbfm->closeFile(fileHandle);
 
     //printf("table %s has a tableId of: %d\n", tableName.c_str(), tableId);            // ##### CORRECT !!!

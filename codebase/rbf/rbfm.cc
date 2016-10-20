@@ -221,24 +221,30 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
     }
 
     // ============ normal case ================
-   
+
     // case 3: slot is valid, record-to-be-deleted is on this page
     short lastSlotNum = page->header.slotCount - 1; 
     // if deleting the very last record, no need to shift anything
     // otherwise shift every following record to the left
     if (rid.slotNum < lastSlotNum) {
+
         // get the size of the rest records first
         int restSize = page->header.freeSpaceOffset - slot.offset - slot.length;  
+
         // shift the rest records to the LEFT by slot.length
+
         shiftBytes((char*)page + slot.offset + slot.length, restSize, 0 - slot.length);
-    
         // adjust offset of the rest records' slots
         for (int slotIndex = rid.slotNum + 1; slotIndex < page->header.slotCount; slotIndex++) {
             Slot curSlot = {};
             readSlotFromPage(page, slotIndex, curSlot);
+            if (curSlot.offset < 0) {
+                continue;
+            }
             curSlot.offset -= slot.length;
             writeSlotToPage(page, slotIndex, curSlot); 
         }
+
     }
     // adjust freeSpace and freeSpaceOffset
     page->header.freeSpace += slot.length;
@@ -253,6 +259,7 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
     delete page; 
     return 0;
 }
+
 
 RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const void *data, const RID &rid) {
 

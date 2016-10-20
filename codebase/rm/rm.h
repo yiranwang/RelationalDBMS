@@ -20,7 +20,7 @@ typedef struct{
     int position;
 } AttributeWithPosition;
 
-//increasing comparator for getAttribute
+//increasing comparator for sort attributes in the function getAttribute
 class CompLess { 
 public: 
     bool operator()(const AttributeWithPosition& attr1, const AttributeWithPosition attr2) { 
@@ -43,6 +43,8 @@ public:
     };
 
     RC close() { 
+        RecordBasedFileManager *rbfm = RecordBasedFileManager::instance();
+        rbfm->closeFile(rbfm_ScanIterator.fileHandle);
         rbfm_ScanIterator.close();
         return 0; 
     };
@@ -66,10 +68,8 @@ public:
 
    
     // ======= start of self defined functions =====
-    void prepareApiTableRecord(const int tableId, const string &tableName, const string &fileName, 
-            void *data, int &size); 
-    void prepareApiColumnRecord(const int tableId, const string &columnName, const AttrType type, 
-            const int columnLength, const int position, void *data);
+    void prepareApiTableRecord(const int tableId, const string &tableName, const string &fileName, void *data, int &size); 
+    void prepareApiColumnRecord(const int tableId, const string &columnName, const AttrType type, const int columnLength, const int position, void *data);
     void getTableIdByTableName(int &tableId, RID &rid, const string &tableName);
     
     // ======= end of self defined functions =====
