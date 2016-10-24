@@ -89,7 +89,7 @@ RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attri
     // case 1: record is deleted
     if (slot.offset < 0) {
     	delete page;
-        //printf("error: this record is deleted\n");
+        if (DEBUG) printf("error: this record is deleted\n");
         return -1;
     }
     // case 2: record is redirected to another page
@@ -270,6 +270,7 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
     // write the updated slot to page and updated page back to file
     writeSlotToPage(page, rid.slotNum, slot);
     if(fileHandle.writePage(rid.pageNum, page) < 0) {
+        delete page;
         return -1;
     }
 
@@ -313,9 +314,9 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
         return -1;
     }
     // find the record size change and the rest records' size:
-    int delta = (int)(updatedRecordSize - slot.length); 
-    int restSize = page->header.freeSpaceOffset - slot.offset - slot.length;  
-    int shiftAmount = 0;
+    short delta = updatedRecordSize - slot.length; 
+    short restSize = page->header.freeSpaceOffset - slot.offset - slot.length;  
+    short shiftAmount = 0;
 
 
     // case 3.1: the page has enough space to hold the updated record
@@ -362,6 +363,9 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
         pointingRid->pageNum = targetRid.pageNum;
         pointingRid->slotNum = targetRid.slotNum;
         slot.length = -1;
+
+
+        printf("This page cannot hold the updated record, it's moved from RID(%u, %u) to RID(%u, %u)\n", rid.pageNum, rid.slotNum, targetRid.pageNum, targetRid.slotNum);
     } 
 
 

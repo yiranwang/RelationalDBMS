@@ -384,17 +384,12 @@ void RecordBasedFileManager::printInnerRecord(const vector<Attribute> &recordDes
                 printf("Error\t|\t");
                 break;
         }
-        //printf("\n------------------------------------------------------------------------------------------\n");
     }
 }
 
 
 void RecordBasedFileManager::printTable(FileHandle fileHandle, const vector<Attribute> &recordDescriptor) {
     
-
-    char str[50];
-    gets(str);
-
     unsigned totalPageNum = fileHandle.getNumberOfPages();
     printf("There are %u pages in this file\n", totalPageNum);
     Page *page = new Page;
@@ -413,15 +408,18 @@ void RecordBasedFileManager::printTable(FileHandle fileHandle, const vector<Attr
 
         for (short j = 0; j < slotCount; j++) {
             RID rid = {.pageNum = (unsigned)i, .slotNum = (unsigned)j};
-            printf("RID(%d, %d)\n", i, j);
+            
 
             Slot slot = {};
             readSlotFromPage(page, j, slot);
-            if (slot.offset == -1 || slot.isRedirected != 0) {
+            if (slot.offset == -1 || slot.length < 0) {
                 continue;
             }
 
             readInnerRecord(fileHandle, recordDescriptor, rid, innerRecord);
+
+            printf("RID(%d, %d): occupis %d bytes in disk\n", i, j, *(short*)innerRecord);
+
             printInnerRecord(recordDescriptor, innerRecord);
             printf("\n========================================================================================\n");
         }

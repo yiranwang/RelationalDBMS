@@ -110,16 +110,21 @@ RC RelationManager::createCatalog() {
 
     prepareApiTableRecord(1, TABLES_TABLE_NAME, TABLES_FILE_NAME, tmpData, apiTableRecordSize);
     if (rbfm->insertRecord(tableFileHandle, tableRecordDescriptor, tmpData, dummyRid) < 0) {
+        free(tmpData);
+        rbfm->closeFile(tableFileHandle);
         return -1;
     }
 
     memset(tmpData, 0, PAGE_SIZE);
     prepareApiTableRecord(2, COLUMNS_TABLE_NAME, COLUMNS_FILE_NAME, tmpData, apiTableRecordSize);
     if (rbfm->insertRecord(tableFileHandle, tableRecordDescriptor, tmpData, dummyRid) < 0) {
+        free(tmpData);
+        rbfm->closeFile(tableFileHandle);
         return -1;
     }
 
     if (rbfm->closeFile(tableFileHandle) < 0) {
+        free(tmpData);
         return -1;
     }
 
@@ -132,9 +137,11 @@ RC RelationManager::createCatalog() {
     //prepare and insert column records
     FileHandle columnFileHandle;
 	if (rbfm->createFile(COLUMNS_FILE_NAME) < 0) {
+        free(tmpData);
         return -1;
     }
     if (rbfm->openFile(COLUMNS_FILE_NAME, columnFileHandle) < 0) {
+        free(tmpData);
         return -1;
     }
     
@@ -144,18 +151,24 @@ RC RelationManager::createCatalog() {
     memset(tmpData, 0, PAGE_SIZE);
     prepareApiColumnRecord(1, "table-id", TypeInt, 4, 1, tmpData);
     if (rbfm->insertRecord(columnFileHandle, columnRecordDescriptor, tmpData, dummyRid) < 0) {
+        free(tmpData);
+        rbfm->closeFile(columnFileHandle);
         return -1;
     }
 
     memset(tmpData, 0, PAGE_SIZE);
     prepareApiColumnRecord(1, "table-name", TypeVarChar, 50, 2, tmpData);
     if (rbfm->insertRecord(columnFileHandle, columnRecordDescriptor, tmpData, dummyRid) < 0) {
+        free(tmpData);
+        rbfm->closeFile(columnFileHandle);
         return -1;
     }
 
     memset(tmpData, 0, PAGE_SIZE);
     prepareApiColumnRecord(1, "file-name", TypeVarChar, 50, 3, tmpData);
     if (rbfm->insertRecord(columnFileHandle, columnRecordDescriptor, tmpData, dummyRid) < 0) {
+        free(tmpData);
+        rbfm->closeFile(columnFileHandle);
         return -1;
     }
 
@@ -164,34 +177,45 @@ RC RelationManager::createCatalog() {
     memset(tmpData, 0, PAGE_SIZE);
     prepareApiColumnRecord(2, "table-id", TypeInt, 4, 1, tmpData);
     if (rbfm->insertRecord(columnFileHandle, columnRecordDescriptor, tmpData, dummyRid) < 0) {
+        free(tmpData);
+        rbfm->closeFile(columnFileHandle);
         return -1;
     }
 
     memset(tmpData, 0, PAGE_SIZE);
     prepareApiColumnRecord(2, "column-name", TypeVarChar, 50, 2, tmpData);
     if (rbfm->insertRecord(columnFileHandle, columnRecordDescriptor, tmpData, dummyRid) < 0) {
+        free(tmpData);
+        rbfm->closeFile(columnFileHandle);
         return -1;
     }
 
     memset(tmpData, 0, PAGE_SIZE);
     prepareApiColumnRecord(2, "column-type", TypeInt, 4, 3, tmpData);
     if (rbfm->insertRecord(columnFileHandle, columnRecordDescriptor, tmpData, dummyRid) < 0) {
+        free(tmpData);
+        rbfm->closeFile(columnFileHandle);
         return -1;
     }
         
     memset(tmpData, 0, PAGE_SIZE);
     prepareApiColumnRecord(2, "column-length", TypeInt, 4, 4, tmpData);
     if (rbfm->insertRecord(columnFileHandle, columnRecordDescriptor, tmpData, dummyRid) < 0) {
+        free(tmpData);
+        rbfm->closeFile(columnFileHandle);
         return -1;
     }
 
     memset(tmpData, 0, PAGE_SIZE);
     prepareApiColumnRecord(2, "column-position", TypeInt, 4, 5, tmpData);
     if (rbfm->insertRecord(columnFileHandle, columnRecordDescriptor, tmpData, dummyRid) < 0) {
+        free(tmpData);
+        rbfm->closeFile(columnFileHandle);
         return -1;
     }
 
     if (rbfm->closeFile(columnFileHandle) < 0) {
+        free(tmpData);
         return -1;
     }
 
@@ -234,6 +258,7 @@ RC RelationManager::createTable(const string &tableName, const vector<Attribute>
     //printTuple(tableRecordDescriptor, data); // (3, tbl_employee, tbl_employee)
 
     if (insertTuple(TABLES_TABLE_NAME, data, rid) < 0) {                                    // ######### BUG
+        free(data);
         return -1;
     }
 
@@ -251,6 +276,7 @@ RC RelationManager::createTable(const string &tableName, const vector<Attribute>
         //printTuple(columnRecordDescriptor, data);
 
         if (insertTuple("Columns", data, rid) < 0) {
+            free(data);
             return -1;
         }
     }
@@ -285,6 +311,7 @@ RC RelationManager::deleteTable(const string &tableName) {
     //rbfm->printTable(tableFileHandle, tableRecordDescriptor);
 
     if (rbfm->deleteRecord(tableFileHandle, tableRecordDescriptor, rid) < 0) {
+        rbfm->closeFile(tableFileHandle);
         return -1;
     }
 
@@ -314,6 +341,9 @@ RC RelationManager::deleteTable(const string &tableName) {
 
     while (rm_ScanIterator.getNextTuple(rid, targetTuple) != -1) {
         if (rbfm->deleteRecord(rm_ScanIterator.rbfm_ScanIterator.fileHandle, columnRecordDescriptor, rid) < 0) {
+            if (DEBUG) printf("Error in delete, rmsi closed\n");
+            rm_ScanIterator.close();
+            free(targetTuple);
             return -1;
         }
     }
@@ -362,6 +392,7 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
 
     RBFM_ScanIterator rbfm_ScanIterator;
     rbfm->scan(fileHandle, columnRecordDescriptor, "table-id", EQ_OP, &tableId, attributeNames, rbfm_ScanIterator);
+    rbfm_ScanIterator.tableName = tableName;
 
     void *recordData = malloc(PAGE_SIZE);
 
@@ -435,6 +466,7 @@ RC RelationManager::insertTuple(const string &tableName, const void *data, RID &
     }
     
     if (rbfm->insertRecord(fileHandle, recordDescriptor, data, rid) < 0) {
+        rbfm->closeFile(fileHandle);
         return -1;
     }
 
@@ -454,11 +486,13 @@ RC RelationManager::deleteTuple(const string &tableName, const RID &rid) {
 
     getAttributes(tableName, recordDescriptor);
 
+
     if (rbfm->openFile(tableName, fileHandle) < 0) {
         return -1;
     }
 
     if (rbfm->deleteRecord(fileHandle, recordDescriptor, rid) < 0) {
+        rbfm->closeFile(fileHandle);
         return -1;
     }
 
@@ -480,6 +514,7 @@ RC RelationManager::updateTuple(const string &tableName, const void *data, const
     }
 
     if (rbfm->updateRecord(fileHandle, recordDescriptor, data, rid) < 0) {
+        rbfm->closeFile(fileHandle);
         return -1;
     }
 
@@ -502,6 +537,7 @@ RC RelationManager::readTuple(const string &tableName, const RID &rid, void *dat
     }
 
     if (rbfm->readRecord(fileHandle, recordDescriptor, rid, data) < 0) {
+        rbfm->closeFile(fileHandle);
         return -1;
     }
 
@@ -543,16 +579,20 @@ RC RelationManager::readAttribute(const string &tableName, const RID &rid, const
     void *targetInnerRecord = malloc(PAGE_SIZE);
     if(rbfm->readInnerRecord(fileHandle, recordDescriptor, rid, targetInnerRecord) < 0) {
         if(DEBUG) printf("Error in readInnerRecord\n");
+        free(targetInnerRecord);
+        rbfm->closeFile(fileHandle);
         return -1;
     }
 
     // read out the attribute from the target inner record given the attrIndex   
     rbfm->readAttributeFromInnerRecord(recordDescriptor, targetInnerRecord, targetAttrIndex, data) ;
 
+
+    free(targetInnerRecord);
     if (rbfm->closeFile(fileHandle) < 0) {
         return -1;
     }
-    
+
     return 0;
 }
 
@@ -575,6 +615,8 @@ RC RelationManager::scan(const string &tableName,
         rm_ScanIterator.rbfm_ScanIterator) < 0) {
         return -1;
     }
+
+    rm_ScanIterator.rbfm_ScanIterator.tableName = tableName;
     
     return 0;
 }
@@ -593,6 +635,8 @@ void RelationManager::getTableIdByTableName(int &tableId, RID &rid, const string
     rbfm->openFile(TABLES_FILE_NAME, fileHandle);
     rbfm->scan(fileHandle, tableRecordDescriptor, "table-name", EQ_OP, tableName.c_str(), 
         attributeNames, rbfm_ScanIterator);
+
+    rbfm_ScanIterator.tableName = tableName;
 
     void *apiTuple = malloc(PAGE_SIZE);
 

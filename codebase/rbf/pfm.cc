@@ -156,7 +156,7 @@ RC FileHandle::appendPage(const void *data)
 unsigned FileHandle::getNumberOfPages()
 {
     if (fd < 0) {
-        if(DEBUG)  fprintf(stderr, "File not open!");
+        if(DEBUG)  printf("Error in FileHandl::getNumberOfPages. Fd < 0, file not open!\n");
         return 0;
     }
     // initialize pageNum  

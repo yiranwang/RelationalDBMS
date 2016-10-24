@@ -1,12 +1,14 @@
 include ../makefile.inc
 
-all: librm.a rmtest_create_tables rmtest_delete_tables rmtest_00 rmtest_01 rmtest_02 rmtest_03 rmtest_04 rmtest_05 rmtest_06 rmtest_07 rmtest_08 rmtest_09 rmtest_10 rmtest_11 rmtest_12 rmtest_13 rmtest_13b rmtest_14 rmtest_15 rmtest_extra_1 rmtest_extra_2
+all: librm.a printTable rmtest_create_tables rmtest_delete_tables rmtest_00 rmtest_01 rmtest_02 rmtest_03 rmtest_04 rmtest_05 rmtest_06 rmtest_07 rmtest_08 rmtest_09 rmtest_10 rmtest_11 rmtest_12 rmtest_13 rmtest_13b rmtest_14 rmtest_15 rmtest_extra_1 rmtest_extra_2
 
 # lib file dependencies
 librm.a: librm.a(rm.o)  # and possibly other .o files
 
 # c file dependencies
 rm.o: rm.h
+
+printTable.o: rm.h rm_test_util.h
 
 rmtest_00.o: rm.h rm_test_util.h
 rmtest_01.o: rm.h rm_test_util.h
@@ -31,6 +33,9 @@ rmtest_create_tables.o: rm.h rm_test_util.h
 rmtest_delete_tables.o: rm.h rm_test_util.h
 
 # binary dependencies
+
+printTable: printTable.o librm.a $(CODEROOT)/rbf/librbf.a
+
 rmtest_create_tables: rmtest_create_tables.o librm.a $(CODEROOT)/rbf/librbf.a
 rmtest_delete_tables: rmtest_delete_tables.o librm.a $(CODEROOT)/rbf/librbf.a
 rmtest_00: rmtest_00.o librm.a $(CODEROOT)/rbf/librbf.a 

@@ -188,6 +188,9 @@ class RBFM_ScanIterator {
 
 public:
     
+    string tableName;
+
+
     bool opened;
 
     FileHandle fileHandle;
@@ -208,17 +211,19 @@ public:
 public:
     RBFM_ScanIterator() {
 
-      opened = false;
-      nextRid.pageNum = 0;
-      nextRid.slotNum = 0;
+        tableName = "";
 
-      conditionAttrIndex = -1;
-      op = NO_OP;
-      value = NULL;
+        opened = false;
+        nextRid.pageNum = 0;
+        nextRid.slotNum = 0;
 
-      recordDescriptor.clear();
-      projectedDescriptor.clear();
-      projectedDescriptorIndex.clear();
+        conditionAttrIndex = -1;
+        op = NO_OP;
+        value = NULL;
+
+        recordDescriptor.clear();
+        projectedDescriptor.clear();
+        projectedDescriptorIndex.clear();
     };
     ~RBFM_ScanIterator() {};
 

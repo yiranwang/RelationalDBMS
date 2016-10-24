@@ -60,6 +60,7 @@ RC RecordBasedFileManager::scan(FileHandle &fileHandle,
 
 
 RC RBFM_ScanIterator::close() { 
+	tableName = "";
 	nextRid.pageNum = 0;
     nextRid.slotNum = 0;
 	opened = false;
@@ -79,7 +80,7 @@ RC RBFM_ScanIterator::close() {
 
 RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) { 
 
-	if (DEBUG) printf("inside rbfm::getNextRecord, next RID = (%d, %d)\n", nextRid.pageNum, nextRid.slotNum);
+	if (DEBUG) printf("Scanning %s...next RID = (%d, %d)\n", this->tableName.c_str(), nextRid.pageNum, nextRid.slotNum);
 
 	if (!opened) {
 		if(DEBUG) printf("Sorry, RBFM_ScanIterator is not opened!\n");
