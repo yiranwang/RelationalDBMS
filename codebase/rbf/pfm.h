@@ -5,7 +5,7 @@ typedef unsigned PageNum;
 typedef int RC;
 typedef char byte;
 
-#define DEBUG 1
+#define DEBUG 0
 #define PAGE_SIZE 4096
 #define HEADER_SIZE 96
 #define DATA_SIZE 4000
@@ -44,6 +44,7 @@ typedef struct
 {
     short offset;           // -1 for deleted records, tombstone
     short length;           // -1 for redirected records, whose rid can be found by slot.offset
+    unsigned char isRedirected;      // if this record is redirected from somewhere else, it's set to non-zero valuei; once marked, it's marked forever
 } Slot;
 
 //  structure of records:

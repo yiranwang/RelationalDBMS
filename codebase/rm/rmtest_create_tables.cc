@@ -2,10 +2,6 @@
 
 int main()
 {
-
-  string str1 = "tbl_employee";
-  string str2 = "tbl_employee2";
-
   // By executing this script, the following tables including the system tables will be removed and constructed again.
 
   // Before executing rmtest_xx, you need to make sure that this script work properly.

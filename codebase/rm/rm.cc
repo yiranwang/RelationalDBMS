@@ -2,6 +2,7 @@
 #include "rm.h"
 #include <stdlib.h>
 #include <fstream>
+#include <iostream>
 
 bool fexists(const std::string& filename);
 
@@ -269,7 +270,7 @@ RC RelationManager::deleteTable(const string &tableName) {
         return -1;
     }
 
-    printf("table file of %s is deleted, now deleting <id, tableName, fileName> from Tables\n", tableName.c_str());
+    //printf("table file of %s is deleted, now deleting <id, tableName, fileName> from Tables\n", tableName.c_str());
 
     int tableId;
     RID rid;
@@ -279,14 +280,20 @@ RC RelationManager::deleteTable(const string &tableName) {
     FileHandle tableFileHandle;
     rbfm->openFile(TABLES_TABLE_NAME, tableFileHandle);
 
+
+    //printf("Before delete in Tables\n");
+    //rbfm->printTable(tableFileHandle, tableRecordDescriptor);
+
     if (rbfm->deleteRecord(tableFileHandle, tableRecordDescriptor, rid) < 0) {
         return -1;
     }
+
+    //printf("After delete in Tables\n");
+    //rbfm->printTable(tableFileHandle, tableRecordDescriptor);
+
     if (rbfm->closeFile(tableFileHandle) < 0) {
         return -1;
     }
-
-    printf("******************************Table info is deleted from Tables, now delete all records where table-id = %d in Columns\n", tableId);
 
 
     vector<string> attributeNames;
@@ -300,15 +307,21 @@ RC RelationManager::deleteTable(const string &tableName) {
 
     //printf("rm::scan(Columns, table-id, EQ_OP, &tableId, attributeNames, rm_ScanIterator) done\n");
 
+
+    //printf("Before delete in Columns\n");
+    //rbfm->printTable(rm_ScanIterator.rbfm_ScanIterator.fileHandle, columnRecordDescriptor);
+
+
     while (rm_ScanIterator.getNextTuple(rid, targetTuple) != -1) {
-        printf("deleting RID(%d, %d) @Columns...\n", rid.pageNum, rid.slotNum);
         if (rbfm->deleteRecord(rm_ScanIterator.rbfm_ScanIterator.fileHandle, columnRecordDescriptor, rid) < 0) {
             return -1;
         }
-        printf("delete RID(%d, %d) from Columns done!\n", rid.pageNum, rid.slotNum);
     }
 
-    printf("delete records in Colulmns done! close rm_ScanIterator and free targetTuple...\n");
+    //printf("After delete in Columns\n");
+    //rbfm->printTable(rm_ScanIterator.rbfm_ScanIterator.fileHandle, columnRecordDescriptor);
+
+
     rm_ScanIterator.close();
     free(targetTuple);
 
@@ -557,8 +570,6 @@ RC RelationManager::scan(const string &tableName,
     if (rbfm->openFile(tableName, fileHandle) < 0) {
         return -1;
     }
-
-    printf("Inside rm::scan. File of %s is opened! fileHandle.fd = %d\n", tableName.c_str(), fileHandle.fd);
 
     if (rbfm->scan(fileHandle, recordDescriptor , conditionAttribute, compOp, value, attributeNames, 
         rm_ScanIterator.rbfm_ScanIterator) < 0) {

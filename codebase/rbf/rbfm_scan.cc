@@ -59,9 +59,27 @@ RC RecordBasedFileManager::scan(FileHandle &fileHandle,
 
 
 
+RC RBFM_ScanIterator::close() { 
+	nextRid.pageNum = 0;
+    nextRid.slotNum = 0;
+	opened = false;
+	op = NO_OP;
+	conditionAttrIndex = -1;
+	if (!value) {
+		free(value);
+		value = NULL;
+	}
+	recordDescriptor.clear();
+	projectedDescriptor.clear();
+	projectedDescriptorIndex.clear();
+	return 0; 
+};
+
+
+
 RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) { 
 
-	printf("inside rbfm::getNextRecord, next RID = (%d, %d)\n", nextRid.pageNum, nextRid.slotNum);
+	if (DEBUG) printf("inside rbfm::getNextRecord, next RID = (%d, %d)\n", nextRid.pageNum, nextRid.slotNum);
 
 	if (!opened) {
 		if(DEBUG) printf("Sorry, RBFM_ScanIterator is not opened!\n");
@@ -85,8 +103,6 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
 		delete page;
 		return -1;
 	}
-
-	printf("page read out!\n");
 
 	short slotCount = page->header.slotCount;
 
@@ -112,10 +128,10 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
 
 	// read out the slot
 	rbfm->readSlotFromPage(page, nextRid.slotNum, targetSlot);
-	printf("slot read out: offset = %d, length = %d!\n", targetSlot.offset, targetSlot.length);
+	//printf("slot read out: offset = %d, length = %d!\n", targetSlot.offset, targetSlot.length);
 
-	// case 4.1: the next slot points to a deleted or redirected record, skip it
-	if (targetSlot.offset == -1 || targetSlot.length == -1) {
+	// case 4.1: the next slot points to a deleted record or it's redirected from somewhere else, skip it
+	if (targetSlot.offset == -1 || targetSlot.isRedirected != 0) {
 		if (DEBUG) printf("the slot points to a deleted or redirected record, skip it\n");
 		delete page;
 		nextRid.slotNum += 1;						// go for next slot
@@ -125,24 +141,25 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
 
 	// ****************************** general case ******************************
 
-	// case 4.2: the targe record is on this page
+	// case 4.2: the target record is on this page
 
 	// read out the inner record
-	printf("allocating memory for tmpInnerRecord ...\n");
+	// printf("allocating memory for tmpInnerRecord ...\n");
 	void *tmpInnerRecord = malloc(PAGE_SIZE);
 
-	printf("tmpInnerRecord malloc(PAGE_SIZE) done\n");
+	//printf("tmpInnerRecord malloc(PAGE_SIZE) done\n");
 	//memset(tmpInnerRecord, 0, PAGE_SIZE);
 	rbfm->readRecordFromPage(page, targetSlot.offset, targetSlot.length, tmpInnerRecord);
 
-	printf("inner record read out!\n");
+	//printf("inner record read out!\n");
 
 	// read out the attribute value to be compared
 	Attribute conditionAttr = recordDescriptor[conditionAttrIndex];
-	void *attributeData = malloc(PAGE_SIZE);
+	void *attributeData = NULL;
+	attributeData = malloc(PAGE_SIZE);
 	rbfm->readAttributeFromInnerRecord(recordDescriptor, tmpInnerRecord, conditionAttrIndex, attributeData);
 
-	printf("attribute read out!\n");
+	//printf("attribute read out!\n");
 
 	// attributeData's 1st byte is nullIndicator: 10000000 means it's NULL
 	// case 4.2.1: this attribute is NULL or condition not met, skip this record
@@ -156,18 +173,18 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
 	}
 
 
-	printf("[Condition met!]\n");
+	//printf("[Condition met!]\n");
 	// case 4.2.2: condition met, compose a tuple of this record into data
 	short tupleSize = 0;
 	rbfm->composeApiTuple(recordDescriptor, projectedDescriptorIndex, tmpInnerRecord, data, tupleSize);
 	
-	printf("\n[Condition Met] the tuple is from this record at RID(%d, %d):\n", nextRid.pageNum, nextRid.slotNum);
-	rbfm->printInnerRecord(recordDescriptor, tmpInnerRecord);
-	printf("\n");
+	//printf("\n[Condition Met] the tuple is from this record at RID(%d, %d):\n", nextRid.pageNum, nextRid.slotNum);
+	//rbfm->printInnerRecord(recordDescriptor, tmpInnerRecord);
+	//printf("\n");
 	
 
-	printf("Next qualified tuple is:\n");
-	rbfm->printRecord(projectedDescriptor, data);
+	//printf("Next qualified tuple is:\n");
+	//rbfm->printRecord(projectedDescriptor, data);
 
 	rid.pageNum = nextRid.pageNum;
 	rid.slotNum = nextRid.slotNum;
@@ -175,30 +192,11 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
 	free(tmpInnerRecord);
 	free(attributeData);
 
-	printf("free tmpInnerRecord and attributeData done\n");
+	//printf("free tmpInnerRecord and attributeData done\n");
 	nextRid.slotNum += 1;						// go for next slot
 
-	printf("------------------------------------------------------\n");
+	//printf("------------------------------------------------------\n");
 	return 0;
-};
-
-
-
-
-RC RBFM_ScanIterator::close() { 
-	nextRid.pageNum = 0;
-    nextRid.slotNum = 0;
-	opened = false;
-	op = NO_OP;
-	conditionAttrIndex = -1;
-	if (!value) {
-		free(value);
-		value = NULL;
-	}
-	recordDescriptor.clear();
-	projectedDescriptor.clear();
-	projectedDescriptorIndex.clear();
-	return 0; 
 };
 
 

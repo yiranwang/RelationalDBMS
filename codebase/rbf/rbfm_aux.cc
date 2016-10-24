@@ -38,8 +38,12 @@ void RecordBasedFileManager::readSlotFromPage(Page *page, const short slotNum, S
 
 
 void RecordBasedFileManager::writeSlotToPage(Page *page, const short slotNum, const Slot &slot) {
-    memcpy((char*)page + PAGE_SIZE - (slotNum + 1) * sizeof(Slot), 
-            &slot, sizeof(Slot));
+    memcpy((char*)page + PAGE_SIZE - (slotNum + 1) * sizeof(Slot), &slot, sizeof(Slot));
+}
+
+
+void RecordBasedFileManager::appendSlotToPage(Page *page, const short slotNum, const Slot &slot) {
+    memcpy((char*)page + PAGE_SIZE - (slotNum + 1) * sizeof(Slot), &slot, sizeof(Slot));
     page->header.slotCount += 1;
     page->header.freeSpace -= sizeof(Slot);
 }
@@ -50,7 +54,7 @@ void RecordBasedFileManager::readRecordFromPage(Page *page, const short offset, 
 }
 
 
-void RecordBasedFileManager::insertRecordToPage(Page *page, const short offset, const void* record, const short recordSize) {
+void RecordBasedFileManager::appendInnerRecordToPage(Page *page, const short offset, const void* record, const short recordSize) {
     memcpy((char*)page + offset, record, recordSize);
     page->header.recordCount += 1;
     page->header.freeSpace -= recordSize;
@@ -81,12 +85,14 @@ void RecordBasedFileManager::shiftBytes(char *start, int length, int delta) {
     char* dest = start + delta;
     // shift left: copy 0, 1, 2, ..., n-1
     if (delta < 0) {
+        //printf("shifting left by %d...\n", 0 - delta);
         for (int i = 0; i < length; i++) {
             dest[i] = start[i];
         }
     } 
     // shift right: copy n-1, n-2, ..., 2, 1, 0
     else {
+        //printf("Shifting right by %d...\n", delta);
         for (int i = length - 1; i >= 0; i--) {
             dest[i] = start[i];
         }
@@ -351,11 +357,11 @@ void RecordBasedFileManager::printInnerRecord(const vector<Attribute> &recordDes
 
     printf("%d attributes in this records\n", *(short*)innerRecord);
     for (int i = 0; i < fieldCount; i++) {
-        printf("@offset: %d;\t%s\t", *(short*)((char*)innerRecord + sizeof(short) * (1 + i)), recordDescriptor[i].name.c_str());
+        printf("@offset: %d\t|\t%s = ", *(short*)((char*)innerRecord + sizeof(short) * (1 + i)), recordDescriptor[i].name.c_str());
 
         short fieldOffset = *(short*)((char*)innerRecord + (1 + i) * sizeof(short));
         if (fieldOffset == -1) {
-            printf("NULL\n");
+            printf("NULL\t");
             continue;
         }
         switch(recordDescriptor[i].type) {
@@ -363,22 +369,66 @@ void RecordBasedFileManager::printInnerRecord(const vector<Attribute> &recordDes
                 int varCharLength = *(int*)((char*)innerRecord + fieldOffset);
                 char varChar[varCharLength + 1];
                 getVarCharData(fieldOffset + sizeof(int), innerRecord, varChar, varCharLength);
-                printf("%s\n", varChar);
+                printf("%s\t|\t", varChar);
                 break;
             }
             case TypeInt: {
-                printf("%d\n", getIntData(fieldOffset, innerRecord));
+                printf("%d\t|\t", getIntData(fieldOffset, innerRecord));
                 break;
             }
             case TypeReal: {
-                printf("%.2f\n", getFloatData(fieldOffset, innerRecord));
+                printf("%.2f\t|\t", getFloatData(fieldOffset, innerRecord));
                 break;
             }
             default: 
-                printf("\n");
+                printf("Error\t|\t");
                 break;
         }
+        //printf("\n------------------------------------------------------------------------------------------\n");
     }
+}
+
+
+void RecordBasedFileManager::printTable(FileHandle fileHandle, const vector<Attribute> &recordDescriptor) {
+    
+
+    char str[50];
+    gets(str);
+
+    unsigned totalPageNum = fileHandle.getNumberOfPages();
+    printf("There are %u pages in this file\n", totalPageNum);
+    Page *page = new Page;
+    char innerRecord [PAGE_SIZE];
+
+
+    for (unsigned i = 0; i < totalPageNum; i++) {
+
+        printf("Reading page %u...\n", i);
+
+        fileHandle.readPage(i, page);
+        short slotCount = page->header.slotCount;
+        printf("There are %d slots on this page\n", slotCount);
+
+        printf("######################## Page %d ################################################\n", i);
+
+        for (short j = 0; j < slotCount; j++) {
+            RID rid = {.pageNum = (unsigned)i, .slotNum = (unsigned)j};
+            printf("RID(%d, %d)\n", i, j);
+
+            Slot slot = {};
+            readSlotFromPage(page, j, slot);
+            if (slot.offset == -1 || slot.isRedirected != 0) {
+                continue;
+            }
+
+            readInnerRecord(fileHandle, recordDescriptor, rid, innerRecord);
+            printInnerRecord(recordDescriptor, innerRecord);
+            printf("\n========================================================================================\n");
+        }
+
+    }
+
+    delete page;
 }
 
 

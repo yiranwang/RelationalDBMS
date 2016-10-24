@@ -71,13 +71,15 @@ public:
 
     void readSlotFromPage(Page *page, const short slotNum, Slot &slot);
 
+    void appendSlotToPage(Page *page, const short slotNum, const Slot &slot);
+
     void writeSlotToPage(Page *page, const short slotNum, const Slot &slot);
 
     void readRecordFromPage(Page *page, const short offset, const short recordSize, void *data);
 
     RC readInnerRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, void *data);
 
-    void insertRecordToPage(Page *page, const short offset, const void *record, const short recordSize);
+    void appendInnerRecordToPage(Page *page, const short offset, const void *record, const short recordSize);
 
     int getIntData(int offset, const void* data);
 
@@ -86,7 +88,7 @@ public:
     RC getVarCharData(int offset, const void* data, char* varChar, const int varCharLength);
     // ==== end of project 1 ===
 
-    // ==== project 2 ===
+    // ==== start of project 2 ===
     void shiftBytes(char *start, int length, int delta);
 
     RC composeApiTuple(const vector<Attribute> &recordDescriptor, vector<int> &projectedDescriptor, 
@@ -94,7 +96,9 @@ public:
 
 
     void printInnerRecord(const vector<Attribute> &recordDescriptor, void *innerRecord);
-    // ==== project 2 ===
+
+    void printTable(FileHandle fileHandle, const vector<Attribute> &recordDescriptor);
+    // ==== end of project 2 ===
 
 
     // ====== end of self defined methods ========

@@ -42,10 +42,10 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
 
     short insertOffset = -1;  // location on the page to insert the record
     short recordSize = -1;
-    char *tmpRecord = (char*)malloc(PAGE_SIZE);
-    // get tmpRecord, recordSize
-    if (composeInnerRecord(recordDescriptor, data, tmpRecord, recordSize) < 0) {
-        delete tmpRecord;
+    char *innerRecord = (char*)malloc(PAGE_SIZE);
+    // get innerRecord, recordSize
+    if (composeInnerRecord(recordDescriptor, data, innerRecord, recordSize) < 0) {
+        delete innerRecord;
         return -1;
     }
 
@@ -56,12 +56,12 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
     if (fileHandle.readPage(rid.pageNum, page) < 0) {
         return -1;
     }
-    // write record onto page
-    insertRecordToPage(page, insertOffset, tmpRecord, recordSize);
+    // append the inner record onto page, header adjusted
+    appendInnerRecordToPage(page, insertOffset, innerRecord, recordSize);
     
-    // write slot onto page
-    Slot slot = {.offset = insertOffset, .length = recordSize}; 
-    writeSlotToPage(page, rid.slotNum, slot); 
+    // append the slot onto page, header adjusted
+    Slot slot = {.offset = insertOffset, .length = recordSize, .isRedirected = 0}; 
+    appendSlotToPage(page, rid.slotNum, slot); 
 
     // write page into file
     if (fileHandle.writePage(rid.pageNum, page) < 0) {
@@ -69,7 +69,7 @@ RC RecordBasedFileManager::insertRecord(FileHandle &fileHandle, const vector<Att
     }
 
     // free the allocated memory
-    free(tmpRecord);
+    free(innerRecord);
     delete page;
     return 0;
 }
@@ -104,6 +104,8 @@ RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attri
     char* innerRecord = (char*)malloc(PAGE_SIZE);
     memcpy(innerRecord, (char*)page + slot.offset, slot.length);
 
+    // should have put below codes into a function: composeApiFromInnerRecord
+
     // get field count (short)
     short fieldCount = *(short*)innerRecord;
     if (fieldCount != (short)(recordDescriptor.size())) {
@@ -114,6 +116,8 @@ RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attri
     short recordOffset = sizeof(short) * (1 + fieldCount);
     int nullBytesNum = getNullIndicatorSize((int)fieldCount); 
     short dataOffset = nullBytesNum;
+
+
     // write inner record out to data in Api format
     int bitPos = CHAR_BIT - 1;
     for (int fieldIndex = 0; fieldIndex < fieldCount; fieldIndex++) {
@@ -202,6 +206,8 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
     // read the page
     Page *page = new Page;
     fileHandle.readPage(rid.pageNum, page);
+
+
     // read slot of the record to be deleted
     Slot slot = {};
     readSlotFromPage(page, rid.slotNum, slot);
@@ -215,7 +221,13 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
     // case 2: record is redirected to another page                                                 
     // because after being updated, the current page cannot hold it                                 
     if (slot.length < 0) {
-        RID nextRid = *(RID*)((char*)page + slot.offset);                                           
+        RID nextRid = *(RID*)((char*)page + slot.offset);              
+
+        // mark this slot as deleted and make it persistent
+        slot.offset = -1;
+        writeSlotToPage(page, rid.slotNum, slot);
+        fileHandle.writePage(rid.pageNum, page);
+
         delete page;
         return deleteRecord(fileHandle, recordDescriptor, nextRid);
     }
@@ -224,28 +236,32 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
 
     // case 3: slot is valid, record-to-be-deleted is on this page
     short lastSlotNum = page->header.slotCount - 1; 
+
     // if deleting the very last record, no need to shift anything
     // otherwise shift every following record to the left
     if (rid.slotNum < lastSlotNum) {
 
         // get the size of the rest records first
-        int restSize = page->header.freeSpaceOffset - slot.offset - slot.length;  
+        short restSize = page->header.freeSpaceOffset - slot.offset - slot.length;  
 
         // shift the rest records to the LEFT by slot.length
 
+
         shiftBytes((char*)page + slot.offset + slot.length, restSize, 0 - slot.length);
         // adjust offset of the rest records' slots
-        for (int slotIndex = rid.slotNum + 1; slotIndex < page->header.slotCount; slotIndex++) {
+        for (short slotIndex = (short)rid.slotNum + 1; slotIndex <= lastSlotNum; slotIndex++) {
+
             Slot curSlot = {};
             readSlotFromPage(page, slotIndex, curSlot);
             if (curSlot.offset < 0) {
                 continue;
             }
+
             curSlot.offset -= slot.length;
             writeSlotToPage(page, slotIndex, curSlot); 
         }
-
     }
+
     // adjust freeSpace and freeSpaceOffset
     page->header.freeSpace += slot.length;
     page->header.freeSpaceOffset -= slot.length;
@@ -256,6 +272,7 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
     if(fileHandle.writePage(rid.pageNum, page) < 0) {
         return -1;
     }
+
     delete page; 
     return 0;
 }
@@ -284,12 +301,14 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
         delete page;
         return updateRecord(fileHandle, recordDescriptor, data, nextRid);
     }
-    // case 3: slot is valid, record-to-be-deleted is in this page
+
+
+
+    // case 3: slot is valid, record-to-be-deleted is on this page
     // first compose the updated inner record and get its size
     short updatedRecordSize = -1;
     char *updatedInnerRecord = (char*)malloc(PAGE_SIZE);
-    if (composeInnerRecord(recordDescriptor, data, updatedInnerRecord, 
-                updatedRecordSize) < 0) {
+    if (composeInnerRecord(recordDescriptor, data, updatedInnerRecord, updatedRecordSize) < 0) {
         delete page;
         return -1;
     }
@@ -297,6 +316,8 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
     int delta = (int)(updatedRecordSize - slot.length); 
     int restSize = page->header.freeSpaceOffset - slot.offset - slot.length;  
     int shiftAmount = 0;
+
+
     // case 3.1: the page has enough space to hold the updated record
     // store the updated record at the original position and adjust the rest
     if (page->header.freeSpace >= delta) {
@@ -307,6 +328,8 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
         page->header.freeSpaceOffset += delta;
         slot.length = updatedRecordSize;
     }
+
+
     // case 3.2: the page doesn't have enough space to hold the updated record
     // replace the record on this page with an RID of the target page
     // store the updated record on the target page
@@ -323,20 +346,35 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
             free(updatedInnerRecord);
             return -1;
         }
+
+        // mark the slot pointed by targetRid as isRecirected
+        Slot tmpSlot = {};
+        Page* tmpPage = new Page;
+        fileHandle.readPage(targetRid.pageNum, tmpPage);
+        readSlotFromPage(tmpPage, targetRid.slotNum, tmpSlot);
+        tmpSlot.isRedirected = 1;
+        writeSlotToPage(tmpPage, targetRid.slotNum, tmpSlot);
+        fileHandle.writePage(targetRid.pageNum, tmpPage);
+        delete tmpPage;
+
         // fill the RID of target page on this page and set slot.length = -1
         RID *pointingRid = (RID*)((char*)page + slot.offset);
         pointingRid->pageNum = targetRid.pageNum;
         pointingRid->slotNum = targetRid.slotNum;
         slot.length = -1;
     } 
+
+
     // adjust offset of the rest records' slots
-    for (int slotIndex = rid.slotNum + 1; 
-            slotIndex < page->header.slotCount; slotIndex++) {
+    for (int slotIndex = rid.slotNum + 1; slotIndex < page->header.slotCount; slotIndex++) {
         Slot curSlot = {};
         readSlotFromPage(page, slotIndex, curSlot);
         curSlot.offset += shiftAmount;
         writeSlotToPage(page, slotIndex, curSlot); 
     }
+
+
+
     // make changes persistent and free memory
     writeSlotToPage(page, rid.slotNum, slot);
     fileHandle.writePage(rid.pageNum, page);
@@ -344,8 +382,6 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
     free(updatedInnerRecord);
     return 0;
 }
-
-
 
 
 
