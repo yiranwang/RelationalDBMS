@@ -448,4 +448,28 @@ void readSizesFromDisk(vector<int> &sizes, int numRecords)
 	}
 }
 
+
+
+void printTable(const string &tableName) {
+
+    printf("Table[%s] is like this:\n", tableName.c_str());
+
+    vector<Attribute> attrs;
+    rm->getAttributes(tableName, attrs);
+
+    for (int i = 0; i < attrs.size(); i++) {
+        printf("%s\t", attrs[i].name.c_str());
+    }
+
+    printf("\n");
+
+    FileHandle fh;
+    rbfm->openFile(tableName, fh);
+    rbfm->printTable(fh, attrs);
+    rbfm->closeFile(fh);
+}
+
+
+
+
 #endif

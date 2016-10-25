@@ -1,24 +1,19 @@
 #include "rm_test_util.h"
+#include <unistd.h>
 
 
 int main(int argc, char** argv) {
 
 	string tableName = argv[1];
 
-	printf("Table[%s] is like this:\n", tableName.c_str());
 
-	vector<Attribute> attrs;
-    rm->getAttributes(tableName, attrs);
+  	if (access(argv[1], F_OK ) == -1) {
+  		printf("talbe %s does not exist!\n", argv[1]);
+  		return -1;
+  	}
 
-    for (int i = 0; i < attrs.size(); i++) {
-    	printf("%s\t", attrs[i].name.c_str());
-    }
+	printTable(tableName);
 
-    printf("\n");
-
-	FileHandle fh;
-    rbfm->openFile(tableName, fh);
-    rbfm->printTable(fh, attrs);
-    rbfm->closeFile(fh);
+	return 0;
 
 }

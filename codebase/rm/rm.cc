@@ -1,10 +1,12 @@
 
 #include "rm.h"
 #include <stdlib.h>
-#include <fstream>
-#include <iostream>
+#include <unistd.h>
 
-bool fexists(const std::string& filename);
+bool fexists(const string& fileName) {
+    printf("Looking for %s...\n", fileName.c_str());
+    return access(fileName.c_str(), F_OK ) != -1;
+}
 
 RelationManager* RelationManager::_rm = 0;
 
@@ -21,7 +23,44 @@ RelationManager::RelationManager() {
 
 	createColumnRecordDescriptor(columnRecordDescriptor);
 
-    tableCount = 0;
+
+    //printf("Constructor of RM, looking for%s...\n", "Tables".c_str());
+
+    // if the catalog exists, scan the Tables to find the lastTableId
+    if (fexists("Tables")) {
+
+        printf("Tables exists, scanning Tables...\n");
+
+        FileHandle fh;
+        rbfm->openFile(TABLES_FILE_NAME, fh);
+
+        RBFM_ScanIterator rbsi;
+        string attr = "table-id";
+        int idVal = 1;
+        vector<string> attributes;      // projected
+        attributes.push_back(attr);
+        rbfm->scan(fh, tableRecordDescriptor, attr, NO_OP, &idVal, attributes, rbsi);
+
+
+        RID rid = {};
+        void *returnedData = malloc(PAGE_SIZE);
+
+        while (rbsi.getNextRecord(rid, returnedData) != RBFM_EOF) {
+            int curTableID = *(int*)((char*)returnedData + 1);
+            if (lastTableId < curTableID) {
+                lastTableId = curTableID;
+            }
+        }
+
+        free(returnedData);
+        rbsi.close();
+        rbfm->closeFile(fh);
+
+    } else {
+        printf("Tablesdoesn't exist, set lastTableId = 0\n");
+        lastTableId = 0;
+    }
+
 }
 
 
@@ -29,9 +68,7 @@ RelationManager::~RelationManager(){
 }
 
 
-void RelationManager::prepareApiTableRecord(const int tableId, const string &tableName, 
-        const string &fileName, void *data, int &size) 
-{
+void RelationManager::prepareApiTableRecord(const int tableId, const string &tableName, const string &fileName, void *data, int &size) {
    
     // data is memset to 0
     // null indicator only needs 1 byte, already set to 0
@@ -59,9 +96,7 @@ void RelationManager::prepareApiTableRecord(const int tableId, const string &tab
 }
 
 
-void RelationManager::prepareApiColumnRecord(const int tableId, const string &columnName, 
-        const AttrType type, const int columnLength, const int position, void *data) 
-{
+void RelationManager::prepareApiColumnRecord(const int tableId, const string &columnName, const AttrType type, const int columnLength, const int position, void *data) {
 
     int offset = 1;         // null indicator is 1 byte, already set to 0
     
@@ -222,7 +257,7 @@ RC RelationManager::createCatalog() {
     // ==============   finished Columns ================
     
     free(tmpData);
-    tableCount = 2;
+    lastTableId = 2;
 
     return 0;
 }
@@ -239,7 +274,8 @@ RC RelationManager::deleteCatalog() {
 
 RC RelationManager::createTable(const string &tableName, const vector<Attribute> &attrs) {
     
-    tableCount++;
+    lastTableId++;
+    printf("Creating table %s. Its table id is %d\n", tableName.c_str(), lastTableId);
     RID rid;
 
     // create a file for this table to store pages of records
@@ -252,17 +288,17 @@ RC RelationManager::createTable(const string &tableName, const vector<Attribute>
     int apiTableRecordSize = 0;
 
     void *data = malloc(PAGE_SIZE);
-    prepareApiTableRecord(tableCount, tableName, fileName, data, apiTableRecordSize);
+    prepareApiTableRecord(lastTableId, tableName, fileName, data, apiTableRecordSize);
 
-    //printf("created apiTableRecord to be inserted to Tables: \n");
-    //printTuple(tableRecordDescriptor, data); // (3, tbl_employee, tbl_employee)
+    printf("created apiTableRecord to be inserted to Tables: \n");
+    printTuple(tableRecordDescriptor, data); 
 
     if (insertTuple(TABLES_TABLE_NAME, data, rid) < 0) {                                    // ######### BUG
         free(data);
         return -1;
     }
 
-    //printf("############## (%d, %s, %s) is inserted to Tables\n", tableCount, tableName.c_str(), tableName.c_str());
+    //printf("############## (%d, %s, %s) is inserted to Tables\n", lastTableId, tableName.c_str(), tableName.c_str());
 
 
     // prepare and insert record descriptor info into Columns
@@ -270,7 +306,7 @@ RC RelationManager::createTable(const string &tableName, const vector<Attribute>
     for (int i = 0; i < attrs.size(); i++) {
         attribute = attrs[i];
         memset(data, 0, PAGE_SIZE);
-        prepareApiColumnRecord(tableCount, attribute.name, attribute.type, attribute.length, i + 1, data);
+        prepareApiColumnRecord(lastTableId, attribute.name, attribute.type, attribute.length, i + 1, data);
 
         //printf("inserting attribute to Columns:\n");
         //printTuple(columnRecordDescriptor, data);
@@ -669,11 +705,6 @@ RC RelationManager::addAttribute(const string &tableName, const Attribute &attr)
 }
 
 
-
-bool fexists(const std::string& filename) {
-  std::ifstream ifile(filename.c_str());
-  return (bool)ifile;
-}
 
 void RelationManager::createTableRecordDescriptor(vector<Attribute> &recordDescriptor) {
     Attribute attr1;
