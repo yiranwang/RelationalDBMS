@@ -14,7 +14,7 @@ using namespace std;
 //  null indicator: n bytes
 //  fields:
 //      case 1: type == string
-//          int length + "ABCD\n": so 4 + str.length + 1 bytes
+//          int length + "ABCD": so 4 + str.length
 //      case 2: type == int / float
 //          4 bytes only
 //
