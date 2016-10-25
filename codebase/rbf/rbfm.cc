@@ -365,7 +365,7 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
         slot.length = -1;
 
 
-        printf("This page cannot hold the updated record, it's moved from RID(%u, %u) to RID(%u, %u)\n", rid.pageNum, rid.slotNum, targetRid.pageNum, targetRid.slotNum);
+        //printf("This page cannot hold the updated record, it's moved from RID(%u, %u) to RID(%u, %u)\n", rid.pageNum, rid.slotNum, targetRid.pageNum, targetRid.slotNum);
     } 
 
 

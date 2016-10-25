@@ -1,10 +1,15 @@
 
 #include "rm.h"
+
+#include <stdio.h>
+#include <string.h>
+
 #include <stdlib.h>
 #include <unistd.h>
+#include <iostream>
 
 bool fexists(const string& fileName) {
-    printf("Looking for %s...\n", fileName.c_str());
+    //printf("Checking if file %s exists...\n", fileName.c_str());
     return access(fileName.c_str(), F_OK ) != -1;
 }
 
@@ -24,12 +29,10 @@ RelationManager::RelationManager() {
 	createColumnRecordDescriptor(columnRecordDescriptor);
 
 
-    //printf("Constructor of RM, looking for%s...\n", "Tables".c_str());
-
     // if the catalog exists, scan the Tables to find the lastTableId
     if (fexists("Tables")) {
 
-        printf("Tables exists, scanning Tables...\n");
+        //printf("%s exists, scanning Tables...\n", TABLES_FILE_NAME.c_str());
 
         FileHandle fh;
         rbfm->openFile(TABLES_FILE_NAME, fh);
@@ -57,7 +60,7 @@ RelationManager::RelationManager() {
         rbfm->closeFile(fh);
 
     } else {
-        printf("Tablesdoesn't exist, set lastTableId = 0\n");
+        //printf("%s doesn't exist, set lastTableId = 0\n", TABLES_FILE_NAME.c_str());
         lastTableId = 0;
     }
 
@@ -275,7 +278,7 @@ RC RelationManager::deleteCatalog() {
 RC RelationManager::createTable(const string &tableName, const vector<Attribute> &attrs) {
     
     lastTableId++;
-    printf("Creating table %s. Its table id is %d\n", tableName.c_str(), lastTableId);
+    //printf("Creating table %s. Its table id is %d\n", tableName.c_str(), lastTableId);
     RID rid;
 
     // create a file for this table to store pages of records
@@ -290,15 +293,11 @@ RC RelationManager::createTable(const string &tableName, const vector<Attribute>
     void *data = malloc(PAGE_SIZE);
     prepareApiTableRecord(lastTableId, tableName, fileName, data, apiTableRecordSize);
 
-    printf("created apiTableRecord to be inserted to Tables: \n");
-    printTuple(tableRecordDescriptor, data); 
 
-    if (insertTuple(TABLES_TABLE_NAME, data, rid) < 0) {                                    // ######### BUG
+    if (insertTuple(TABLES_TABLE_NAME, data, rid) < 0) {                                   
         free(data);
         return -1;
     }
-
-    //printf("############## (%d, %s, %s) is inserted to Tables\n", lastTableId, tableName.c_str(), tableName.c_str());
 
 
     // prepare and insert record descriptor info into Columns
@@ -311,7 +310,7 @@ RC RelationManager::createTable(const string &tableName, const vector<Attribute>
         //printf("inserting attribute to Columns:\n");
         //printTuple(columnRecordDescriptor, data);
 
-        if (insertTuple("Columns", data, rid) < 0) {
+        if (insertTuple(COLUMNS_FILE_NAME, data, rid) < 0) {
             free(data);
             return -1;
         }
@@ -324,7 +323,7 @@ RC RelationManager::createTable(const string &tableName, const vector<Attribute>
 }
 
 RC RelationManager::deleteTable(const string &tableName) {   
-    if (tableName == "Tables" || tableName == "Columns" || !fexists(tableName)) {
+    if (strcmp(tableName.c_str(), TABLES_TABLE_NAME) == 0 || strcmp(tableName.c_str(), COLUMNS_TABLE_NAME) == 0|| !fexists(tableName)) {
         return -1;
     }
 
@@ -422,7 +421,7 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
     FileHandle fileHandle;
 
     if (rbfm->openFile(COLUMNS_FILE_NAME, fileHandle) < 0) {
-        if (DEBUG) printf("Error in openFile%s\n", COLUMNS_FILE_NAME.c_str());
+        if (DEBUG) printf("Error in openFile: %s\n", COLUMNS_FILE_NAME);
         return -1;
     }
 

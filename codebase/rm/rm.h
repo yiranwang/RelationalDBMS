@@ -10,10 +10,11 @@
 using namespace std;
 
 # define RM_EOF (-1)  // end of a scan operator
-const string TABLES_TABLE_NAME  = "Tables";
-const string TABLES_FILE_NAME   = "Tables";
-const string COLUMNS_TABLE_NAME = "Columns";
-const string COLUMNS_FILE_NAME  = "Columns";
+
+static const char TABLES_TABLE_NAME[]  = "Tables";
+static const char TABLES_FILE_NAME[]   = "Tables";
+static const char COLUMNS_TABLE_NAME[] = "Columns";
+static const char COLUMNS_FILE_NAME[]  = "Columns";
 
 typedef struct{
     Attribute attribute;
