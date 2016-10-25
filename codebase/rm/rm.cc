@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <iostream>
+#include <algorithm>
 
 bool fexists(const string& fileName) {
     //printf("Checking if file %s exists...\n", fileName.c_str());
@@ -73,8 +74,8 @@ RelationManager::~RelationManager(){
 
 void RelationManager::prepareApiTableRecord(const int tableId, const string &tableName, const string &fileName, void *data, int &size) {
    
-    // data is memset to 0
     // null indicator only needs 1 byte, already set to 0
+    memset(data, 0, PAGE_SIZE);
     int offset = 1;
     
     // write tableId
@@ -101,6 +102,7 @@ void RelationManager::prepareApiTableRecord(const int tableId, const string &tab
 
 void RelationManager::prepareApiColumnRecord(const int tableId, const string &columnName, const AttrType type, const int columnLength, const int position, void *data) {
 
+    memset(data, 0, PAGE_SIZE);
     int offset = 1;         // null indicator is 1 byte, already set to 0
     
     // write tableId
@@ -406,6 +408,7 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
         return 0;
     } 
 
+
     int tableId = 0;
     RID rid;
     
@@ -433,7 +436,8 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
 
     
     int attriLength;
-    char* attriName = (char*)malloc(51);
+    char* attriName = (char*)malloc(PAGE_SIZE);
+    memset(attriName, 0, PAGE_SIZE);
     int attriNameLength;
     int position;
     AttrType attriType;

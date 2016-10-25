@@ -239,7 +239,7 @@ RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const vector<Att
 
     // if deleting the very last record, no need to shift anything
     // otherwise shift every following record to the left
-    if (rid.slotNum < lastSlotNum) {
+    if (rid.slotNum < (unsigned)lastSlotNum) {
 
         // get the size of the rest records first
         short restSize = page->header.freeSpaceOffset - slot.offset - slot.length;  

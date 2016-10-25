@@ -159,7 +159,7 @@ RC RecordBasedFileManager::readInnerRecord(FileHandle &fileHandle, const vector<
 
 
     // validate slotNum
-    if (rid.slotNum >= slotCount) {
+    if (rid.slotNum >= (unsigned)slotCount) {
         //printf("slot to be read does not exist!\n");
         return -1;
     }
@@ -418,7 +418,7 @@ void RecordBasedFileManager::printTable(FileHandle fileHandle, const vector<Attr
 
             readInnerRecord(fileHandle, recordDescriptor, rid, innerRecord);
 
-            printf("RID(%d, %d): occupis %d bytes in disk\n", i, j, *(short*)innerRecord);
+            printf("RID(%d, %d): occupies %d bytes in disk\n", i, j, slot.length);
 
             printInnerRecord(recordDescriptor, innerRecord);
             printf("\n========================================================================================\n");

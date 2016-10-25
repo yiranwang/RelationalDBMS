@@ -80,7 +80,12 @@ RC RBFM_ScanIterator::close() {
 
 RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) { 
 
-	if (DEBUG) printf("Scanning %s...next RID = (%d, %d)\n", this->tableName.c_str(), nextRid.pageNum, nextRid.slotNum);
+	// conditionAttribute not exist and not NO_OP, just return -1
+	if (conditionAttrIndex == recordDescriptor.size() && op != NO_OP) {
+		return RBFM_EOF;
+	}
+
+	if (DEBUG) printf("Scanning ...next RID = (%d, %d)\n", nextRid.pageNum, nextRid.slotNum);
 
 	if (!opened) {
 		if(DEBUG) printf("Sorry, RBFM_ScanIterator is not opened!\n");
@@ -115,7 +120,7 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
 	}
 
 	// case 3: previous record visited is the last one on this page, need to scan next page
-	if (nextRid.slotNum == slotCount) {
+	if (nextRid.slotNum == (unsigned)slotCount) {
 		if (DEBUG) printf("previous record visited is the last one on this page, go to the 1st record on the next page\n");
 		nextRid.pageNum += 1;
 		nextRid.slotNum = 0;
@@ -154,23 +159,27 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
 
 	//printf("inner record read out!\n");
 
-	// read out the attribute value to be compared
-	Attribute conditionAttr = recordDescriptor[conditionAttrIndex];
-	void *attributeData = NULL;
-	attributeData = malloc(PAGE_SIZE);
-	rbfm->readAttributeFromInnerRecord(recordDescriptor, tmpInnerRecord, conditionAttrIndex, attributeData);
+	// comparison is needed only if op != NO_OP
+	// conditionAttriIndex is a valid index now, otherwise -1 is returned at the beginning of this function
+	if (op != NO_OP) {
+		// read out the attribute value to be compared
+		Attribute conditionAttr = recordDescriptor[conditionAttrIndex];				
+		void *attributeData = malloc(PAGE_SIZE);
+		rbfm->readAttributeFromInnerRecord(recordDescriptor, tmpInnerRecord, conditionAttrIndex, attributeData);
 
-	//printf("attribute read out!\n");
+		//printf("attribute read out!\n");
 
-	// attributeData's 1st byte is nullIndicator: 10000000 means it's NULL
-	// case 4.2.1: this attribute is NULL or condition not met, skip this record
-	if (*(unsigned char*)attributeData != 0 || !opCompare((char*)attributeData + 1, value, op, conditionAttr.type)) {
-		if (DEBUG) printf("this attribute is NULL or condition not met, skip this record\n");
-		delete page;
-		free(tmpInnerRecord);
+		// attributeData's 1st byte is nullIndicator: 10000000 means it's NULL
+		// case 4.2.1: this attribute is NULL or condition not met, skip this record
+		if (*(unsigned char*)attributeData != 0 || !opCompare((char*)attributeData + 1, value, op, conditionAttr.type)) {
+			if (DEBUG) printf("this attribute is NULL or condition not met, skip this record\n");
+			delete page;
+			free(tmpInnerRecord);
+			free(attributeData);
+			nextRid.slotNum += 1;						// go for next slot
+			return getNextRecord(rid, data);
+		}
 		free(attributeData);
-		nextRid.slotNum += 1;						// go for next slot
-		return getNextRecord(rid, data);
 	}
 
 
@@ -191,7 +200,6 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
 	rid.slotNum = nextRid.slotNum;
 	delete page;
 	free(tmpInnerRecord);
-	free(attributeData);
 
 	//printf("free tmpInnerRecord and attributeData done\n");
 	nextRid.slotNum += 1;						// go for next slot
