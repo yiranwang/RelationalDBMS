@@ -23,14 +23,12 @@ RC IndexManager::createFile(const string &fileName) {
     return PagedFileManager::instance()->createFile(fileName);
 }
 
-RC IndexManager::destroyFile(const string &fileName)
-{
+RC IndexManager::destroyFile(const string &fileName) {
     return PagedFileManager::instance()->destroyFile(fileName);
 }
 
 RC IndexManager::openFile(const string &fileName, IXFileHandle &ixfileHandle) {
     return PagedFileManager::instance()->openFile(fileName, ixfileHandle.fileHandle);
-
 }
 
 RC IndexManager::closeFile(IXFileHandle &ixfileHandle) {
@@ -62,38 +60,35 @@ RC IndexManager::scan(IXFileHandle &ixfileHandle,
 void IndexManager::printBtree(IXFileHandle &ixfileHandle, const Attribute &attribute) const {
 }
 
-IX_ScanIterator::IX_ScanIterator()
-{
+IX_ScanIterator::IX_ScanIterator() {
 }
 
-IX_ScanIterator::~IX_ScanIterator()
-{
+IX_ScanIterator::~IX_ScanIterator() {
 }
 
-RC IX_ScanIterator::getNextEntry(RID &rid, void *key)
-{
+RC IX_ScanIterator::getNextEntry(RID &rid, void *key) {
     return -1;
 }
 
-RC IX_ScanIterator::close()
-{
+RC IX_ScanIterator::close() {
     return -1;
 }
 
 
-IXFileHandle::IXFileHandle()
-{
+IXFileHandle::IXFileHandle() {
     ixReadPageCounter = 0;
     ixWritePageCounter = 0;
     ixAppendPageCounter = 0;
+
 }
 
-IXFileHandle::~IXFileHandle()
-{
+IXFileHandle::~IXFileHandle() {
 }
 
-RC IXFileHandle::collectCounterValues(unsigned &readPageCount, unsigned &writePageCount, unsigned &appendPageCount)
-{
-    return -1;
+RC IXFileHandle::collectCounterValues(unsigned &readPageCount, unsigned &writePageCount, unsigned &appendPageCount) {
+    readPageCount = ixReadPageCounter;
+    writePageCount = ixWritePageCounter;
+    appendPageCount = ixAppendPageCounter;
+    return 0;
 }
 

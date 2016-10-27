@@ -75,6 +75,7 @@ private:
 class FileHandle {
 public:
     // variables to keep the counter for each operation
+    string fileName;
     unsigned readPageCounter;
     unsigned writePageCounter;
     unsigned appendPageCounter;

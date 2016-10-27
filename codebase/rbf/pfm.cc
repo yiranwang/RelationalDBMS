@@ -48,6 +48,7 @@ RC PagedFileManager::openFile(const string &fileName, FileHandle &fileHandle) {
         return -1;
     } else {
         fileHandle.fd = fd;
+        fileHandle.fileName = fileName;
         return 0;
     }
 }
