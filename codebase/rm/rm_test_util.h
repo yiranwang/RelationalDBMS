@@ -458,7 +458,7 @@ void printTable(const string &tableName) {
     vector<Attribute> attrs;
     rm->getAttributes(tableName, attrs);
 
-    for (int i = 0; i < attrs.size(); i++) {
+    for (unsigned i = 0; i < attrs.size(); i++) {
         printf("%s\t", attrs[i].name.c_str());
     }
 

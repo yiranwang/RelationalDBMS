@@ -335,6 +335,7 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
     // replace the record on this page with an RID of the target page
     // store the updated record on the target page
     // updatedRecord object is not used afterwards
+    // TODO: reduce disk IO from 2 to 1
     else {
         // replace record with RID
         // shift rest records to the LEFT by slot.length - sizeof(RID)
@@ -348,7 +349,7 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
             return -1;
         }
 
-        // mark the slot pointed by targetRid as isRecirected
+        // mark the slot pointed by targetRid as isRedirected
         Slot tmpSlot = {};
         Page* tmpPage = new Page;
         fileHandle.readPage(targetRid.pageNum, tmpPage);
