@@ -15,7 +15,6 @@ RC RecordBasedFileManager::scan(FileHandle &fileHandle,
       	RBFM_ScanIterator &rbfm_ScanIterator) 
 {
 
-
 	rbfm_ScanIterator.opened = true;
 	rbfm_ScanIterator.fileHandle = fileHandle;
 
@@ -34,12 +33,24 @@ RC RecordBasedFileManager::scan(FileHandle &fileHandle,
 	rbfm_ScanIterator.op = compOp;
 
 	// initialize predicate value
+	// TypeVarChar case: value is in length|data format
 	if (value == NULL) {
 		rbfm_ScanIterator.value = NULL;
 	} else {
-		unsigned dataLength = fieldAttr.type == TypeVarChar ? strlen((char*)value) + 1 : sizeof(int);
-		rbfm_ScanIterator.value = malloc(dataLength);
-		memcpy(rbfm_ScanIterator.value, value, dataLength);
+		unsigned dataLength = sizeof(int);
+
+		// build a string in case of TypeVarChar
+		if (fieldAttr.type == TypeVarChar) {
+			dataLength = *(int*)value;
+			rbfm_ScanIterator.value = malloc(dataLength + 1);
+			memcpy(rbfm_ScanIterator.value, (char*)value + sizeof(int), dataLength);
+			*((char*)(rbfm_ScanIterator.value) + dataLength)= '\0';
+		}
+		else {
+			rbfm_ScanIterator.value = malloc(dataLength);
+			memcpy(rbfm_ScanIterator.value, value, dataLength);
+		}	
+		
 		//printf("copied data of length %d, which is: %s\n", dataLength, (char*)(rbfm_ScanIterator.value));
 	}
 

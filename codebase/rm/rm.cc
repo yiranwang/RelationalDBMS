@@ -664,7 +664,6 @@ RC RelationManager::scan(const string &tableName,
 // find tableId of tableName in Tables
 void RelationManager::getTableIdByTableName(int &tableId, RID &rid, const string &tableName) {
 
-    //printf("Looking for tableId of %s...\n", tableName.c_str());
     vector<string> attributeNames;
     attributeNames.push_back("table-id");
 
@@ -672,8 +671,18 @@ void RelationManager::getTableIdByTableName(int &tableId, RID &rid, const string
     FileHandle fileHandle;
     RBFM_ScanIterator rbfm_ScanIterator;
     rbfm->openFile(TABLES_FILE_NAME, fileHandle);
-    rbfm->scan(fileHandle, tableRecordDescriptor, "table-name", EQ_OP, tableName.c_str(), 
-        attributeNames, rbfm_ScanIterator);
+
+    // change tableName.c_str() in the format length|data
+
+    int tableNameLength = strlen(tableName.c_str());
+    void *tableNameInnerFormat = malloc(sizeof(int) + tableNameLength);
+    *(int*)tableNameInnerFormat = tableNameLength;
+    
+    memcpy((char*)tableNameInnerFormat + sizeof(int), tableName.c_str(), tableNameLength);
+
+    rbfm->scan(fileHandle, tableRecordDescriptor, "table-name", EQ_OP, tableNameInnerFormat, attributeNames, rbfm_ScanIterator);
+
+    free(tableNameInnerFormat);
 
     rbfm_ScanIterator.tableName = tableName;
 
