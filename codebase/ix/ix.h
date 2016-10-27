@@ -76,6 +76,8 @@ class IX_ScanIterator {
 class IXFileHandle {
     public:
 
+    FileHandle fileHandle;
+
     // variables to keep counter for each operation
     unsigned ixReadPageCounter;
     unsigned ixWritePageCounter;

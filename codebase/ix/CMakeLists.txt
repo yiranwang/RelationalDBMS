@@ -9,3 +9,6 @@ add_library(ix ${IX_SOURCES})
 
 add_executable(ixtest_01 ixtest_01.cc)
 target_link_libraries(ixtest_01 ix rbf rm)
+
+add_executable(ixtest_02 ixtest_02.cc)
+target_link_libraries(ixtest_02 ix rbf rm)

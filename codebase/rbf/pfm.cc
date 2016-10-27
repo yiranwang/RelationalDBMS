@@ -1,15 +1,10 @@
 #include "pfm.h"
 #include <fcntl.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <unistd.h>
 
 PagedFileManager* PagedFileManager::_pf_manager = 0;
 
-PagedFileManager* PagedFileManager::instance()
-{
+PagedFileManager* PagedFileManager::instance() {
     if(!_pf_manager)
         _pf_manager = new PagedFileManager();
 
@@ -17,18 +12,15 @@ PagedFileManager* PagedFileManager::instance()
 }
 
 
-PagedFileManager::PagedFileManager()
-{
+PagedFileManager::PagedFileManager() {
 }
 
 
-PagedFileManager::~PagedFileManager()
-{
+PagedFileManager::~PagedFileManager() {
 }
 
 
-RC PagedFileManager::createFile(const string &fileName)
-{
+RC PagedFileManager::createFile(const string &fileName) {
     //If O_CREAT and O_EXCL are set, open() will fail if the file exists
     int fd = open(fileName.c_str(), O_WRONLY | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (fd == -1) {
@@ -39,15 +31,13 @@ RC PagedFileManager::createFile(const string &fileName)
 }
 
 
-RC PagedFileManager::destroyFile(const string &fileName)
-{
+RC PagedFileManager::destroyFile(const string &fileName) {
     int rc = unlink(fileName.c_str());
     return rc;
 }
 
 
-RC PagedFileManager::openFile(const string &fileName, FileHandle &fileHandle)
-{ 
+RC PagedFileManager::openFile(const string &fileName, FileHandle &fileHandle) {
     if (fileHandle.fd > 0) {
         printf("file descriptor is larger than 0!\n");
         return -1;
@@ -63,31 +53,27 @@ RC PagedFileManager::openFile(const string &fileName, FileHandle &fileHandle)
 }
 
 
-RC PagedFileManager::closeFile(FileHandle &fileHandle)
-{
+RC PagedFileManager::closeFile(FileHandle &fileHandle) {
     int rc = close(fileHandle.fd);
     fileHandle.fd = -1;
     return rc;
 }
 
 
-FileHandle::FileHandle()
-{
+FileHandle::FileHandle() {
     readPageCounter = 0;
     writePageCounter = 0;
     appendPageCounter = 0;
     fd = -1;
-    totalPages = -1;
+    totalPages = 0;
 }
 
 
-FileHandle::~FileHandle()
-{
+FileHandle::~FileHandle() {
 }
 
 
-RC FileHandle::readPage(PageNum pageNum, void *data)
-{
+RC FileHandle::readPage(PageNum pageNum, void *data) {
     if (fd < 0) {
         if(DEBUG) fprintf(stderr, "File not open!");
         return -1;
@@ -98,7 +84,7 @@ RC FileHandle::readPage(PageNum pageNum, void *data)
         return -1;
     }
     if (lseek(fd, pageNum * PAGE_SIZE, SEEK_SET) < 0) {
-        if(DEBUG) fprintf(stderr, "Error in readPage: lseek(fd(%d), pageNum(%d) * PAGE_SIZE, SEEK_SET) < 0\n", fd, pageNum);
+        if(DEBUG) fprintf(stderr, "readPage err: lseek(fd(%d), pageNum(%d) * PAGE_SIZE, SEEK_SET) < 0\n", fd, pageNum);
         return -1;
     }
     off_t bytesRead = read(fd, data, PAGE_SIZE);
@@ -134,8 +120,7 @@ RC FileHandle::writePage(PageNum pageNum, const void *data)
 }
 
 
-RC FileHandle::appendPage(const void *data)
-{
+RC FileHandle::appendPage(const void *data) {
     if (fd < 0) {
         if(DEBUG) fprintf(stderr, "File not open!");
         return -1;
@@ -153,25 +138,22 @@ RC FileHandle::appendPage(const void *data)
 }
 
 
-unsigned FileHandle::getNumberOfPages()
-{
+unsigned FileHandle::getNumberOfPages() {
     if (fd < 0) {
         if(DEBUG)  printf("Error in FileHandl::getNumberOfPages. Fd < 0, file not open!\n");
         return 0;
     }
-    // initialize pageNum  
-    if (totalPages < 0) {
-        lseek(fd, 0, SEEK_SET);                                         // place position at the beginning
-    unsigned long fileSize = lseek(fd, 0, SEEK_END);                // place position at the end
-        totalPages  = fileSize / PAGE_SIZE;
-        lseek(fd, 0, SEEK_SET);                                         // place position at the beginning
-    }
+
+    lseek(fd, 0, SEEK_SET);                                         // place position at the beginning
+    unsigned long fileSize = (unsigned long)lseek(fd, 0, SEEK_END); // place position at the end
+    totalPages  = fileSize / PAGE_SIZE;
+    lseek(fd, 0, SEEK_SET);                                         // place position at the beginning
+
     return (unsigned)totalPages;
 }
 
 
-RC FileHandle::collectCounterValues(unsigned &readPageCount, unsigned &writePageCount, unsigned &appendPageCount)
-{
+RC FileHandle::collectCounterValues(unsigned &readPageCount, unsigned &writePageCount, unsigned &appendPageCount) {
     readPageCount = readPageCounter;
     writePageCount = writePageCounter;
     appendPageCount = appendPageCounter;
@@ -185,7 +167,7 @@ RC FileHandle::readPageHeader(PageNum pageNum, void *data) {
         return -1;
     }
     if (pageNum >= (unsigned)totalPages) {
-        if(DEBUG) fprintf(stderr, "Error in readPage: pageNum: %d >= total # of pages: %d.\n", pageNum, totalPages);
+        if(DEBUG) fprintf(stderr, "Error in readPage: pageNum: %d >= total # of pages: %lu.\n", pageNum, totalPages);
         return -1;
     }
     if (lseek(fd, pageNum * PAGE_SIZE, SEEK_SET) < 0) {
