@@ -83,8 +83,10 @@ class IndexManager {
 
 
         // auxiliary functions
-        void initializeIndex(IXFileHandle &ixfileHandle, const int attrType);
-        IXPage initializeIXPage(unsigned pageNum, char pageType, AttrType attrType);
+        int compareKey(const void *key1, const void *key2, const AttrType attrType);
+
+        RC initializeIndex(IXFileHandle &ixfileHandle, const AttrType attrType);
+        IXPage *initializeIXPage(unsigned pageNum, char pageType, AttrType attrType);
         IXPage *findLeafPage(IXFileHandle &ixfileHandle, const void *key, const RID &rid);
 
 

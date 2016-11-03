@@ -1,4 +1,5 @@
 
+#include <cstdlib>
 #include "ix.h"
 
 
@@ -12,8 +13,8 @@ int IndexManager::compareKey(const void *key1, const void *key2, const AttrType 
         int length1 = *(int*)key1;
         int length2 = *(int*)key2;
 
-        char *str1 = (char*)malloc(lenght1 + 1);
-        char *str2 = (char*)malloc(lenght2 + 1);
+        char *str1 = (char*)malloc(length1 + 1);
+        char *str2 = (char*)malloc(length2 + 1);
 
         memcpy(str1, (char*)key1 + length1, length1);
         str1[length1] = '\0';
@@ -28,12 +29,12 @@ int IndexManager::compareKey(const void *key1, const void *key2, const AttrType 
 IXPage* IndexManager::initializeIXPage(unsigned pageNum, char pageType, AttrType attrType) {
     IXPage *newPage = new IXPage;
 
-    newPage.header.pageNum = pageNum;
+    newPage->header.pageNum = pageNum;
 
     // initialize pointers to invalid values
     newPage->header.leftmostPtr = 0;
-    newPage->header.prevPage = 0;
-    newPage->header.nextPage = 0;
+    newPage->header.prevPageNum = 0;
+    newPage->header.nextPageNum = 0;
 
     newPage->header.freeSpaceSize = PAGE_SIZE - sizeof(IXPageHeader);
     newPage->header.freeSpaceOffset = sizeof(IXPageHeader);
@@ -49,10 +50,10 @@ IXPage* IndexManager::initializeIXPage(unsigned pageNum, char pageType, AttrType
 }
 
 
-RC IndexManager::initializeIndex(IXFileHandle &ixfileHandle, const int attrType) {
+RC IndexManager::initializeIndex(IXFileHandle &ixfileHandle, const AttrType attrType) {
 
     // insert directory page, set attribute type
-    IXPage *dirPage = initializeIXpage(0, DIR_PAGE_TYPE, attrType);
+    IXPage *dirPage = initializeIXPage(0, DIR_PAGE_TYPE, attrType);
     dirPage->header.leftmostPtr = 1;                     // set next page as root page
     ixfileHandle.appendPage(dirPage);
     delete(dirPage);

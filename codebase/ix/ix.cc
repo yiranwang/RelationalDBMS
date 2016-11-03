@@ -37,9 +37,9 @@ RC IndexManager::closeFile(IXFileHandle &ixfileHandle) {
 RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid) {
 
     // if index file is empty, initialize the index file
-    unsigned pageCount = ixfileHandle.fh.getNumberOfPages();
+    unsigned pageCount = ixfileHandle.fileHandle.getNumberOfPages();
     if (pageCount == 0) {
-        initilizeIndex(ixfileHandle, attribute.type);
+        initializeIndex(ixfileHandle, attribute.type);
     }
 
 
