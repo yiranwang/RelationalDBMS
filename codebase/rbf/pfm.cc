@@ -1,6 +1,7 @@
 #include "pfm.h"
 #include <fcntl.h>
 #include <unistd.h>
+#include <cstdlib>
 
 PagedFileManager* PagedFileManager::_pf_manager = 0;
 
@@ -48,7 +49,8 @@ RC PagedFileManager::openFile(const string &fileName, FileHandle &fileHandle) {
         return -1;
     } else {
         fileHandle.fd = fd;
-        fileHandle.fileName = fileName;
+        fileHandle.fileName = (char*)malloc(strlen(fileName.c_str()) + 1);
+        strcpy(fileHandle.fileName, fileName.c_str());
         return 0;
     }
 }
@@ -66,6 +68,7 @@ FileHandle::FileHandle() {
     writePageCounter = 0;
     appendPageCounter = 0;
     fd = -1;
+    fileName = NULL;
     totalPages = 0;
 }
 

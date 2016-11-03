@@ -8,6 +8,40 @@
 
 # define IX_EOF (-1)  // end of the index scan
 
+// page type bit masks
+# define DIR_PAGE_TYPE (0)
+# define LEAF_PAGE_TYPE (1)
+# define INDEX_PAGE_TYPE (2)
+# define ROOT_PAGE_TYPE (4)
+
+
+typedef struct {
+
+    unsigned pageNum;
+    unsigned leftmostPtr;           // leftmost pointer; when this is a directory page, it's used to point to root page
+    unsigned prevPageNum;           // double linked list only used in leaf page
+    unsigned nextPageNum;
+
+    short freeSpaceSize;            // size of free space
+    short freeSpaceOffset;          // starting address of free space
+
+    short entryCount;               // number of entries on this page
+    char pageType;                  // indicate if this is a root page, index page or leaf page
+    char attrType;                  // attribute type inside this index file: int, float or varChar
+
+
+    //short firstEntryOffset;       // fixed: sizeof(IXPageHeader)
+    short lastEntryOffset;          // can help skip scanning the whole page
+
+} IXPageHeader;
+
+
+typedef struct {
+    IXPageHeader header;
+    char data[PAGE_SIZE - sizeof(IXPageHeader)];
+} IXPage;
+
+
 class IX_ScanIterator;
 class IXFileHandle;
 
@@ -45,6 +79,16 @@ class IndexManager {
 
         // Print the B+ tree in pre-order (in a JSON record format)
         void printBtree(IXFileHandle &ixfileHandle, const Attribute &attribute) const;
+
+
+
+        // auxiliary functions
+        void initializeIndex(IXFileHandle &ixfileHandle, const int attrType);
+        IXPage initializeIXPage(unsigned pageNum, char pageType, AttrType attrType);
+        IXPage *findLeafPage(IXFileHandle &ixfileHandle, const void *key, const RID &rid);
+
+
+
 
     protected:
         IndexManager();
@@ -91,6 +135,11 @@ class IXFileHandle {
 
 	// Put the current counter values of associated PF FileHandles into variables
 	RC collectCounterValues(unsigned &readPageCount, unsigned &writePageCount, unsigned &appendPageCount);
+
+
+    RC readPage(PageNum pageNum, void *data) { return fileHandle.readPage(pageNum, data); }
+    RC writePage(PageNum pageNum, const void *data) { return fileHandle.writePage(pageNum, data); }
+    RC appendPage(const void *data) { return fileHandle.appendPage(data); }
 
 };
 
