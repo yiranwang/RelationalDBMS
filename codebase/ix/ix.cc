@@ -81,6 +81,7 @@ RC IndexManager::scan(IXFileHandle &ixfileHandle,
 
 
     // initialize ixsi
+    ix_ScanIterator.open = true;
     ix_ScanIterator.ixfh = ixfileHandle;
     ix_ScanIterator.attrType = attribute.type;
 
@@ -103,8 +104,9 @@ RC IndexManager::scan(IXFileHandle &ixfileHandle,
     char* entryPtr = (char*)targetLeafPage + sizeof(IXPageHeader);
     unsigned entryNum = 0;
     while (entryNum < targetLeafPage->header.entryCount && compareKey(entryPtr, lowKey, attribute.type) < 0) {
-        int dataLen = attribute.type == TypeVarChar ? sizeof(int) + *(int*)entryPtr : sizeof(int);
-        entryPtr += dataLen;
+
+        int keyLen = attribute.type == TypeVarChar ? sizeof(int) + *(int*)entryPtr : sizeof(int);
+        entryPtr += keyLen + sizeof(RID);
         entryNum++;
     }
 
@@ -140,44 +142,6 @@ RC IndexManager::scan(IXFileHandle &ixfileHandle,
 
 void IndexManager::printBtree(IXFileHandle &ixfileHandle, const Attribute &attribute) const {
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-IX_ScanIterator::IX_ScanIterator() {
-}
-
-IX_ScanIterator::~IX_ScanIterator() {
-}
-
-RC IX_ScanIterator::getNextEntry(RID &rid, void *key) {
-    return -1;
-}
-
-RC IX_ScanIterator::close() {
-    return -1;
-}
-
-
-
-
-
 
 
 
