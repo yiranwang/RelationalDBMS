@@ -51,7 +51,7 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
 
     if (rootPage->header.entryCount == 0) {
 
-        //insertEntryToEmptyRoot(ixfileHandle, rootPage, key, rid);
+        insertEntryToEmptyRoot(ixfileHandle, rootPage, key, rid);
 
     }else {
         insertTree(ixfileHandle, rootPage, key, rid, NULL);
@@ -195,9 +195,11 @@ IXFileHandle::~IXFileHandle() {
 }
 
 RC IXFileHandle::collectCounterValues(unsigned &readPageCount, unsigned &writePageCount, unsigned &appendPageCount) {
-    readPageCount = ixReadPageCounter;
-    writePageCount = ixWritePageCounter;
-    appendPageCount = ixAppendPageCounter;
+    fileHandle.collectCounterValues(readPageCount, writePageCount, appendPageCount);
+
+    ixReadPageCounter = readPageCount;
+    ixWritePageCounter = writePageCount;
+    ixAppendPageCounter = appendPageCount;
     return 0;
 }
 

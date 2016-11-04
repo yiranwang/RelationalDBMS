@@ -40,7 +40,7 @@ RC PagedFileManager::destroyFile(const string &fileName) {
 
 RC PagedFileManager::openFile(const string &fileName, FileHandle &fileHandle) {
     if (fileHandle.fd > 0) {
-        printf("file descriptor is larger than 0!\n");
+        if (DEBUG) printf("file descriptor is larger than 0!\n");
         return -1;
     }
 
