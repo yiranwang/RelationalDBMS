@@ -42,7 +42,22 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
         initializeIndex(ixfileHandle, attribute.type);
     }
 
+    IXPage *dirPage = new IXPage;
+    ixfileHandle.readPage(0, dirPage);
 
+    IXPage *rootPage = new IXPage;
+    ixfileHandle.readPage(dirPage->header.leftmostPtr, rootPage);
+
+    if (rootPage->header.entryCount == 0) {
+
+        //insertEntryToEmptyRoot(ixfileHandle, rootPage, key, rid);
+
+    }else {
+        insertTree(ixfileHandle, rootPage, key, rid, NULL);
+    }
+
+    delete(dirPage);
+    delete(rootPage);
 
     return 0;
 }
