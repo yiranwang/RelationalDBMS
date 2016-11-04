@@ -117,6 +117,11 @@ class IndexManager {
 class IX_ScanIterator {
     public:
 
+        IXFileHandle ixfh;
+        AttrType attrType;
+        RID nextEid;                // rid of the next data entry
+
+
 		// Constructor
         IX_ScanIterator();
 

@@ -1,5 +1,6 @@
 
 #include "ix.h"
+#include "../rbf/rbfm.h"
 
 IndexManager* IndexManager::_index_manager = 0;
 
@@ -79,8 +80,63 @@ RC IndexManager::scan(IXFileHandle &ixfileHandle,
         IX_ScanIterator &ix_ScanIterator) {
 
 
-    return -1;
+    // initialize ixsi
+    ix_ScanIterator.ixfh = ixfileHandle;
+    ix_ScanIterator.attrType = attribute.type;
+
+
+    // fetch directory page
+    IXPage *dirPage = new IXPage;
+    ixfileHandle.readPage(0, dirPage);
+    unsigned rootPageNum = dirPage->header.leftmostPtr;
+    delete dirPage;
+
+    // fetch root page
+    IXPage *rootPage = new IXPage;
+    ixfileHandle.readPage(rootPageNum, rootPage);
+
+    // fetch the leaf page that MAY contain the data entry
+    IXPage *targetLeafPage = findLeafPage(ixfileHandle, rootPage, lowKey);
+    delete rootPage;
+
+    // search for the data entry satisfying low key
+    char* entryPtr = (char*)targetLeafPage + sizeof(IXPageHeader);
+    unsigned entryNum = 0;
+    while (entryNum < targetLeafPage->header.entryCount && compareKey(entryPtr, lowKey, attribute.type) < 0) {
+        int dataLen = attribute.type == TypeVarChar ? sizeof(int) + *(int*)entryPtr : sizeof(int);
+        entryPtr += dataLen;
+        entryNum++;
+    }
+
+
+
+    RID tmpNextEid = {};
+
+    // if all data entries on this leaf page have been examined, set 0th entry on next page as the next data entry
+    if (entryNum == targetLeafPage->header.entryCount) {
+        tmpNextEid.pageNum = targetLeafPage->header.pageNum + 1;
+        tmpNextEid.slotNum = 0;
+    }
+    // else the matched data entry is on this page
+    else {
+
+        // decide if this data entry can considered as the next data entry
+        if  (compareKey(entryPtr, lowKey, attribute.type) == 0 && !lowKeyInclusive) {
+            entryNum++;
+        }
+        tmpNextEid.pageNum = targetLeafPage->header.pageNum;
+        tmpNextEid.slotNum = entryNum;
+    }
+
+    ix_ScanIterator.nextEid.pageNum = tmpNextEid.pageNum;
+    ix_ScanIterator.nextEid.slotNum = tmpNextEid.slotNum;
+
+
+    return 0;
+
 }
+
+
 
 void IndexManager::printBtree(IXFileHandle &ixfileHandle, const Attribute &attribute) const {
 }
