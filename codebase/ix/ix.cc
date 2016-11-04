@@ -44,7 +44,6 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
 
 
 
-
     return 0;
 }
 

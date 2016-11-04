@@ -18,6 +18,7 @@
 typedef struct {
 
     unsigned pageNum;
+    unsigned parent;                // parent index
     unsigned leftmostPtr;           // leftmost pointer; when this is a directory page, it's used to point to root page
     unsigned prevPageNum;           // double linked list only used in leaf page
     unsigned nextPageNum;
@@ -27,7 +28,7 @@ typedef struct {
 
     short entryCount;               // number of entries on this page
     char pageType;                  // indicate if this is a root page, index page or leaf page
-    char attrType;                  // attribute type inside this index file: int, float or varChar
+    AttrType attrType;                  // attribute type inside this index file: int, float or varChar
 
 
     //short firstEntryOffset;       // fixed: sizeof(IXPageHeader)
@@ -83,11 +84,17 @@ class IndexManager {
 
 
         // auxiliary functions
+        int key_length(const AttrType attrType, const void* key);
         int compareKey(const void *key1, const void *key2, const AttrType attrType);
+
+        void insertTree(IXFileHandle &ixfileHandle, IXPage *page, const void *key, const RID &rid, void* newChildEntry);
+
+        int findInsertOffsetInNonLeafPage(IXPage *page, const void *key, int &countNode);
+        int findInsertOffset(IXPage *page, const void *key, int &countNode);
 
         RC initializeIndex(IXFileHandle &ixfileHandle, const AttrType attrType);
         IXPage *initializeIXPage(unsigned pageNum, char pageType, AttrType attrType);
-        IXPage *findLeafPage(IXFileHandle &ixfileHandle, const void *key, const RID &rid);
+        IXPage *findLeafPage(IXFileHandle &ixfileHandle, IXPage *page, const void *key);
 
 
 
