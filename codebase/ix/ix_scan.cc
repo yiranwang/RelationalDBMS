@@ -38,16 +38,17 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key) {
 
     // find key length of the target entry
     int entryKeyLen = attrType == TypeVarChar ? sizeof(int) + *(int*)entryPtr : sizeof(int);
-    memcpy(key, entryPtr, entryKeyLen);
+    memcpy(key, entryPtr, (size_t)entryKeyLen);
     memcpy(&rid, (char*)entryKeyLen + entryKeyLen, sizeof(RID));
-    delete targetLeafPage;
+
 
     nextEid.slotNum++;
     if (nextEid.slotNum == targetLeafPage->header.entryCount) {
-        nextEid.pageNum++;
+        nextEid.pageNum = targetLeafPage->header.nextPageNum;
         nextEid.slotNum = 0;
     }
 
+    delete targetLeafPage;
     return 0;
 }
 

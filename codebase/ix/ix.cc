@@ -116,7 +116,7 @@ RC IndexManager::scan(IXFileHandle &ixfileHandle,
 
     // if all data entries on this leaf page have been examined, set 0th entry on next page as the next data entry
     if (entryNum == targetLeafPage->header.entryCount) {
-        tmpNextEid.pageNum = targetLeafPage->header.pageNum + 1;
+        tmpNextEid.pageNum = targetLeafPage->header.nextPageNum;
         tmpNextEid.slotNum = 0;
     }
     // else the matched data entry is on this page
