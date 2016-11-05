@@ -39,7 +39,7 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key) {
     // find key length of the target entry
     int entryKeyLen = attrType == TypeVarChar ? sizeof(int) + *(int*)entryPtr : sizeof(int);
     memcpy(key, entryPtr, (size_t)entryKeyLen);
-    memcpy(&rid, (char*)entryKeyLen + entryKeyLen, sizeof(RID));
+    memcpy(&rid, entryPtr + entryKeyLen, sizeof(RID));
 
 
     nextEid.slotNum++;

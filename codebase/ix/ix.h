@@ -47,10 +47,53 @@ typedef struct {
 } IXPage;
 
 
-class IX_ScanIterator;
-class IXFileHandle;
+class IXFileHandle {
+public:
+
+    FileHandle fileHandle;
+
+    // variables to keep counter for each operation
+    unsigned ixReadPageCounter;
+    unsigned ixWritePageCounter;
+    unsigned ixAppendPageCounter;
+
+    // Constructor
+    IXFileHandle();
+
+    // Destructor
+    ~IXFileHandle();
+
+    // Put the current counter values of associated PF FileHandles into variables
+    RC collectCounterValues(unsigned &readPageCount, unsigned &writePageCount, unsigned &appendPageCount);
 
 
+    RC readPage(PageNum pageNum, void *data) { return fileHandle.readPage(pageNum, data); }
+    RC writePage(PageNum pageNum, const void *data) { return fileHandle.writePage(pageNum, data); }
+    RC appendPage(const void *data) { return fileHandle.appendPage(data); }
+
+};
+
+
+class IX_ScanIterator {
+public:
+    bool open;
+    IXFileHandle ixfh;
+    AttrType attrType;
+    RID nextEid;                // rid of the next data entry
+
+
+    // Constructor
+    IX_ScanIterator();
+
+    // Destructor
+    ~IX_ScanIterator();
+
+    // Get next matching entry
+    RC getNextEntry(RID &rid, void *key);
+
+    // Terminate index scan
+    RC close();
+};
 
 
 class IndexManager {
@@ -91,7 +134,9 @@ class IndexManager {
 
 
         // auxiliary functions
+
         int key_length(const AttrType attrType, const void* key);
+        int compareKey(const void *key1, const void *key2, const AttrType attrType);
 
         void insertEntryToEmptyRoot(IXFileHandle &ixfileHandle, IXPage *rootPage, const void *key, const RID &rid);
         void insertTree(IXFileHandle &ixfileHandle, IXPage *page, const void *key, const RID &rid, void* newChildEntry);
@@ -117,80 +162,6 @@ class IndexManager {
 };
 
 
-
-
-class IX_ScanIterator {
-    public:
-        bool open;
-        IXFileHandle ixfh;
-        AttrType attrType;
-        RID nextEid;                // rid of the next data entry
-
-
-		// Constructor
-        IX_ScanIterator();
-
-        // Destructor
-        ~IX_ScanIterator();
-
-        // Get next matching entry
-        RC getNextEntry(RID &rid, void *key);
-
-        // Terminate index scan
-        RC close();
-};
-
-
-
-class IXFileHandle {
-    public:
-
-    FileHandle fileHandle;
-
-    // variables to keep counter for each operation
-    unsigned ixReadPageCounter;
-    unsigned ixWritePageCounter;
-    unsigned ixAppendPageCounter;
-
-    // Constructor
-    IXFileHandle();
-
-    // Destructor
-    ~IXFileHandle();
-
-	// Put the current counter values of associated PF FileHandles into variables
-	RC collectCounterValues(unsigned &readPageCount, unsigned &writePageCount, unsigned &appendPageCount);
-
-
-    RC readPage(PageNum pageNum, void *data) { return fileHandle.readPage(pageNum, data); }
-    RC writePage(PageNum pageNum, const void *data) { return fileHandle.writePage(pageNum, data); }
-    RC appendPage(const void *data) { return fileHandle.appendPage(data); }
-
-};
-
-
-
-int compareKey(const void *key1, const void *key2, const AttrType attrType) {
-    if (attrType == TypeInt) {
-        return *(int*)key1 - *(int*)key2;
-    }
-    else if (attrType == TypeReal) {
-        return *(float*)key1 - *(float*)key2;
-    } else {
-        int length1 = *(int*)key1;
-        int length2 = *(int*)key2;
-
-        char *str1 = (char*)malloc(length1 + 1);
-        char *str2 = (char*)malloc(length2 + 1);
-
-        memcpy(str1, (char*)key1 + length1, length1);
-        str1[length1] = '\0';
-        memcpy(str2, (char*)key2 + length2, length2);
-        str2[length2] = '\0';
-
-        return strcmp(str1, str2);
-    }
-}
 
 
 
