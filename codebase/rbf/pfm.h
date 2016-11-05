@@ -5,7 +5,7 @@ typedef unsigned PageNum;
 typedef int RC;
 typedef char byte;
 
-#define DEBUG 1
+#define DEBUG 0
 #define PAGE_SIZE 4096
 #define HEADER_SIZE 96
 #define DATA_SIZE 4000

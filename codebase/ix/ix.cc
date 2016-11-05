@@ -140,12 +140,16 @@ RC IndexManager::scan(IXFileHandle &ixfileHandle,
 }
 
 
-
 void IndexManager::printBtree(IXFileHandle &ixfileHandle, const Attribute &attribute) const {
+    // fetch directory page
+    IXPage *dirPage = new IXPage;
+    ixfileHandle.readPage(0, dirPage);
+    int rootPageNum = dirPage->header.leftmostPtr;
+
+    DFSPrintBTree(rootPageNum, ixfileHandle, attribute);
+    printf("\n");
+    delete dirPage;
 }
-
-
-
 
 
 

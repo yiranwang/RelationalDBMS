@@ -1,6 +1,8 @@
 
 #include <cstdlib>
 #include "ix.h"
+#include<iostream>
+
 int IndexManager::key_length(const AttrType attrType, const void* key){
     if(attrType == TypeVarChar){
         unsigned len = *(unsigned*)key;
@@ -55,8 +57,8 @@ IXPage* IndexManager::initializeIXPage(unsigned pageNum, char pageType, AttrType
         newPage->header.parent = 1;
         newPage->header.leftmostPtr = 2;
 
-        newPage->header.prevPageNum = 1;
-        newPage->header.nextPageNum = 1;
+        newPage->header.prevPageNum = 0;
+        newPage->header.nextPageNum = 0;
         newPage->header.isRoot = true;
 
     }else if (pageType == LEAF_PAGE_TYPE) {
@@ -676,6 +678,255 @@ IXPage * IndexManager::findLeafPage(IXFileHandle &ixfileHandle, IXPage *page, co
 
     return NULL;
 
+}
+
+void IndexManager::DFSPrintBTree(int pageNum, IXFileHandle &ixfileHandle, const Attribute &attribute) const{
+    IXPage *page = new IXPage;
+    ixfileHandle.readPage(pageNum, page);
+    int entryCount = page->header.entryCount;
+
+    if (entryCount == 0) {
+        return;
+    }
+
+    if (attribute.type == TypeInt) {
+
+        // index page
+        if (page->header.pageType == INDEX_PAGE_TYPE) {
+            vector<int> keys;
+            vector<int> pids;
+
+            int offset = sizeof(IXPageHeader);
+            for (int i = 0; i < entryCount; i++) {
+                int key = *(int*)((char*)page + offset);
+                offset += sizeof(int);
+                keys.push_back(key);
+                int pid = *(int*)((char*)page + offset);
+                offset += sizeof(int);
+                pids.push_back(pid);
+            }
+
+            cout<< "{\"keys\": [";
+            for (int i = 0; i < keys.size(); i++) {
+                cout << "\"" << keys[i] << "\"";
+                if (i != keys.size() - 1) {
+                    cout << ",";
+                }
+            }
+            cout << "]," << endl;
+            cout << "\"children\": [" << endl;
+
+            for (int i = 0; i < pids.size(); i++) {
+                if (i != 0) {
+                    cout << "," << endl;
+                }
+                DFSPrintBTree(pids[i], ixfileHandle, attribute);
+                cout << "]}";
+            }
+
+            // is leaf page
+        }else {
+            vector<int> keys;
+            vector<RID> rids;
+
+            int offset = sizeof(IXPageHeader);
+            for (int i = 0; i < entryCount; i++) {
+                int key = *(int*)((char*)page + offset);
+                offset += sizeof(int);
+                keys.push_back(key);
+                RID rid = *(RID*)((char*)page + offset);
+                offset += sizeof(RID);
+                rids.push_back(rid);
+            }
+            cout << "{\"keys\": [";
+
+            int i = 0;
+            for (i = 0; i < keys.size(); i++) {
+                if (i == 0) {
+                    cout << "\"" << keys[i] << ":[";
+
+                }else if (keys[i] != keys[i - 1]) {
+                    cout << "]\",";
+                    cout << "\"" << keys[i] << ":[";
+
+                }else{
+                    cout << ",";
+                }
+
+                cout << "(" << rids[i].pageNum << "," << rids[i].slotNum << ")";
+            }
+            cout << "]\"";
+
+            if (i == keys.size() && page->header.nextPageNum == page->header.pageNum) {
+                cout << "]}" << endl;
+            }
+
+        }
+
+    }else if (attribute.type == TypeReal) {
+
+        // index page
+        if (page->header.pageType == INDEX_PAGE_TYPE) {
+            vector<float> keys;
+            vector<int> pids;
+
+            int offset = sizeof(IXPageHeader);
+            for (int i = 0; i < entryCount; i++) {
+                float key = *(float*)((char*)page + offset);
+                offset += sizeof(float);
+                keys.push_back(key);
+                int pid = *(int*)((char*)page + offset);
+                offset += sizeof(int);
+                pids.push_back(pid);
+            }
+
+            cout << "{\"keys\" :[";
+            for (int i = 0; i < keys.size(); i++) {
+                cout << "\"" << keys[i] << "\"";
+                if (i != keys.size() - 1) {
+                    cout << ",";
+                }
+            }
+            cout << "]," << endl;
+            cout << "\"children\": [" << endl;
+
+            for (int i = 0; i < pids.size(); i++) {
+                if (i != 0) {
+                    cout<<","<<endl;
+                }
+                DFSPrintBTree(pids[i], ixfileHandle, attribute);
+                cout<<"]}";
+            }
+
+            // is leaf page
+        }else {
+            vector<float> keys;
+            vector<RID> rids;
+
+            int offset = sizeof(IXPageHeader);
+            for (int i = 0; i < entryCount; i++) {
+                float key = *(float*)((char*)page + offset);
+                offset += sizeof(float);
+                keys.push_back(key);
+                RID rid = *(RID*)((char*)page + offset);
+                offset += sizeof(RID);
+                rids.push_back(rid);
+            }
+            cout<< "{\"keys\" :[";
+
+            int i = 0;
+            for (i = 0; i < keys.size(); i++) {
+                if (i == 0) {
+                    cout << "\"" << keys[i] << ":[";
+
+                }else if (keys[i] != keys[i - 1]) {
+                    cout <<"]\",";
+                    cout << "\"" << keys[i] << ":[";
+
+                }else{
+                    cout<<",";
+                }
+
+                cout << "(" << rids[i].pageNum << "," << rids[i].slotNum <<")";
+            }
+            cout << "]\"";
+
+            if (i == keys.size() && page->header.nextPageNum == page->header.pageNum) {
+                cout << "]}" << endl;
+            }
+
+        }
+
+    }else if (attribute.type == TypeVarChar) {
+
+        char* key = (char*)malloc(PAGE_SIZE);
+        int keyLength = 0;
+
+        // index page
+        if (page->header.pageType == INDEX_PAGE_TYPE) {
+            vector<string> keys;
+            vector<int> pids;
+
+            int offset = sizeof(IXPageHeader);
+            for (int i = 0; i < entryCount; i++) {
+                keyLength = *(int*)((char*)page + offset);
+                offset += sizeof(int);
+
+                memcpy(key, (char*)page + offset, keyLength);
+                string s(key);
+                keys.push_back(s);
+                offset += keyLength;
+
+                int pid = *(int*)((char*)page + offset);
+                offset += sizeof(int);
+                pids.push_back(pid);
+            }
+
+            cout<< "{\"keys\" :[";
+            for (int i = 0; i < keys.size(); i++) {
+                printf("\"%s\"", keys[i].c_str());
+                if (i != keys.size() - 1) {
+                    cout<<",";
+                }
+            }
+            cout<<"],"<<endl;
+            cout<<"\"children\" :["<<endl;
+
+            for (int i = 0; i < pids.size(); i++) {
+                if (i != 0) {
+                    cout<<","<<endl;
+                }
+                DFSPrintBTree(pids[i], ixfileHandle, attribute);
+                cout<<"]}";
+            }
+
+            // is leaf page
+        }else {
+            vector<string> keys;
+            vector<RID> rids;
+
+            int offset = sizeof(IXPageHeader);
+            for (int i = 0; i < entryCount; i++) {
+                keyLength = *(int *) ((char *) page + offset);
+                offset += sizeof(int);
+
+                memcpy(key, (char *) page + offset, keyLength);
+                string s(key);
+                keys.push_back(s);
+                offset += keyLength;
+
+                RID rid = *(RID *) ((char *) page + offset);
+                offset += sizeof(RID);
+                rids.push_back(rid);
+            }
+
+            cout<< "{\"keys\" :[";
+            int i = 0;
+            for (i = 0; i < keys.size(); i++) {
+                if (i == 0) {
+                    cout << "\""<<keys[i]<<":[";
+
+                }else if (strcmp(keys[i].c_str(), keys[i - 1].c_str()) != 0) {
+                    cout <<"]\",";
+                    cout << "\""<<keys[i]<<":[";
+
+                }else{
+                    cout<<",";
+                }
+
+                cout << "(" << rids[i].pageNum << "," << rids[i].slotNum << ")";
+            }
+            cout << "]\"";
+
+            if (i == keys.size() && page->header.nextPageNum == page->header.pageNum) {
+                cout<<"]}" << endl;
+            }
+
+        }
+        free(key);
+
+    }
+    delete(page);
 }
 
 

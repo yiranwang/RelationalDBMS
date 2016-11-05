@@ -146,6 +146,8 @@ class IndexManager {
 
         IXPage *findNextPage(IXFileHandle &ixfileHandle, IXPage *page, const void *key);
 
+        void DFSPrintBTree(int pageNum, IXFileHandle &ixfileHandle, const Attribute &attribute) const;
+
         RC initializeIndex(IXFileHandle &ixfileHandle, const AttrType attrType);
         IXPage *initializeIXPage(unsigned pageNum, char pageType, AttrType attrType);
         IXPage *findLeafPage(IXFileHandle &ixfileHandle, IXPage *page, const void *key);
