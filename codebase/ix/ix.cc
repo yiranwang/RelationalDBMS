@@ -53,7 +53,9 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
         insertEntryToEmptyRoot(ixfileHandle, rootPage, key, rid);
 
     }else {
-        insertTree(ixfileHandle, rootPage, key, rid, NULL);
+
+        void *newChildEntry = NULL;
+        insertTree(ixfileHandle, rootPage, key, rid, newChildEntry);
     }
 
     delete(dirPage);

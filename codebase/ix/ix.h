@@ -139,7 +139,7 @@ class IndexManager {
         int compareKey(const void *key1, const void *key2, const AttrType attrType);
 
         void insertEntryToEmptyRoot(IXFileHandle &ixfileHandle, IXPage *rootPage, const void *key, const RID &rid);
-        void insertTree(IXFileHandle &ixfileHandle, IXPage *page, const void *key, const RID &rid, void* newChildEntry);
+        void insertTree(IXFileHandle &ixfileHandle, IXPage *page, const void *key, const RID &rid, void* &newChildEntry);
 
         int findInsertOffsetInNonLeafPage(IXPage *page, const void *key, int &countNode);
         int findInsertOffset(IXPage *page, const void *key, int &countNode);

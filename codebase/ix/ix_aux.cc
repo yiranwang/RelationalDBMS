@@ -13,6 +13,8 @@ int IndexManager::key_length(const AttrType attrType, const void* key){
 
 int IndexManager::compareKey(const void *key1, const void *key2, const AttrType attrType) {
     if (attrType == TypeInt) {
+        int k1 = *(int*)key1;
+        int k2 = *(int*)key2;
         return *(int*)key1 - *(int*)key2;
     }
     else if (attrType == TypeReal) {
@@ -112,8 +114,8 @@ void IndexManager::insertEntryToEmptyRoot(IXFileHandle &ixfileHandle, IXPage *ro
                                         rootPage->header.attrType);
 
     int keyLength = key_length(rootPage->header.attrType, key);
-    memcpy((char*)leafPage, (char*)key, keyLength);
-    *(RID*)((char*)leafPage + keyLength) = rid;
+    memcpy((char*)leafPage->data, (char*)key, keyLength);
+    *(RID*)((char*)leafPage->data + keyLength) = rid;
 
 
     leafPage->header.leftmostPtr = 0;
@@ -127,6 +129,8 @@ void IndexManager::insertEntryToEmptyRoot(IXFileHandle &ixfileHandle, IXPage *ro
     leafPage->header.lastEntryOffset = sizeof(IXPageHeader);
     leafPage->header.isRoot = false;
 
+    ixfileHandle.appendPage(leafPage);
+
     prevLeafPage->header.nextPageNum = leafPage->header.pageNum;
 
     // insert new entry into empty root
@@ -135,8 +139,9 @@ void IndexManager::insertEntryToEmptyRoot(IXFileHandle &ixfileHandle, IXPage *ro
     rootPage->header.entryCount++;
     rootPage->header.freeSpaceOffset += (keyLength + sizeof(int));
     rootPage->header.freeSpaceSize -= (keyLength + sizeof(int));
+    rootPage->header.lastEntryOffset = sizeof(IXPageHeader);
 
-    ixfileHandle.writePage(leafPage->header.pageNum, leafPage);
+    //ixfileHandle.writePage(leafPage->header.pageNum, leafPage);
     ixfileHandle.writePage(prevLeafPage->header.pageNum, prevLeafPage);
     ixfileHandle.writePage(rootPage->header.pageNum, rootPage);
 
@@ -146,12 +151,17 @@ void IndexManager::insertEntryToEmptyRoot(IXFileHandle &ixfileHandle, IXPage *ro
 
 
 void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const void *key, const RID &rid,
-                              void* newChildEntry) {
+                              void* &newChildEntry) {
+
+    if (DEBUG) {
+        if (page->header.entryCount >= 169) {
+
+        }
+    }
+
     int pageType = page->header.pageType;
     // if the page to insert is leaf page
     if (pageType == LEAF_PAGE_TYPE) {
-
-        //IXPage *page = findLeafPage(ixfileHandle, page, key);
 
         int keyLength = key_length(page->header.attrType, key);
         int insertSize = keyLength + sizeof(RID);
@@ -265,7 +275,7 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
             //compose newChildEntry that will be returned
             // newChildEntry : key + PID
             void *willReturn = malloc(keyLength + sizeof(int));
-            memcpy((char*)willReturn, key, keyLength);
+            memcpy((char*)willReturn, (char*)key, keyLength);
             *(int*)((char*)willReturn + keyLength) = page->header.pageNum;
             newChildEntry = willReturn;
 
@@ -273,7 +283,7 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
             ixfileHandle.writePage(page->header.pageNum, page);
 
             delete(newPage);
-            free(willReturn);
+            //free(willReturn);
             free(doubleSpace);
         }
 
@@ -328,6 +338,7 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
             page->header.freeSpaceOffset += newChildEntryKeyLength + sizeof(int);
             page->header.lastEntryOffset += newChildEntryKeyLength + sizeof(int);
 
+            free(newChildEntry);
             newChildEntry = NULL;
 
             ixfileHandle.writePage(page->header.pageNum, page);
@@ -461,7 +472,8 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
             ixfileHandle.writePage(page->header.pageNum, page);
             ixfileHandle.writePage(newPage->header.pageNum, newPage);
 
-            free(willReturn);
+            free(newChildEntry);
+            //free(willReturn);
             free(doubleSpace);
             delete(newPage);
         }
@@ -482,6 +494,7 @@ IXPage* IndexManager::findNextPage(IXFileHandle &ixfileHandle, IXPage *page, con
 
     // if key < firstKey, skip
     void* firstKey = page->data;
+
     if (compareKey(key, firstKey, page->header.attrType) < 0) {
 
         nextPageNum = page->header.leftmostPtr;
@@ -493,9 +506,10 @@ IXPage* IndexManager::findNextPage(IXFileHandle &ixfileHandle, IXPage *page, con
 
     // if key >= lastKey, skip
     void* lastKey = (char*)page + page->header.lastEntryOffset;
+
     if (compareKey(key, lastKey, page->header.attrType) >= 0) {
 
-        nextPageNum = *(int*)((char*)page + PAGE_SIZE - sizeof(int));
+        nextPageNum = *(int*)((char*)page + page->header.freeSpaceOffset - sizeof(int));
         ixfileHandle.readPage(nextPageNum, nextPage);
         return nextPage;
     }
@@ -507,11 +521,13 @@ IXPage* IndexManager::findNextPage(IXFileHandle &ixfileHandle, IXPage *page, con
     int offset = sizeof(IXPageHeader);
 
     for (int i = 0; i < entryCount - 1; i++) {
-        void* curKey = page + offset;
+        void* curKey = (char*)page + offset;
         int curKeyLength = key_length(page->header.attrType, curKey);
-        void* nextKey = page + offset + curKeyLength + sizeof(int);
+        void* nextKey = (char*)page + offset + curKeyLength + sizeof(int);
+
 
         if (compareKey(key, curKey, page->header.attrType) >= 0 && compareKey(key, nextKey, page->header.attrType) < 0) {
+
             nextPageNum = *(int*)(page + offset + curKeyLength);
             ixfileHandle.readPage(nextPageNum, nextPage);
             return nextPage;
@@ -519,7 +535,7 @@ IXPage* IndexManager::findNextPage(IXFileHandle &ixfileHandle, IXPage *page, con
         offset += curKeyLength + sizeof(int);
     }
 
-    free(nextPage);
+    delete(nextPage);
 
     return NULL;
 }
@@ -542,10 +558,11 @@ int IndexManager::findInsertOffset(IXPage *page, const void *key, int &countNode
     int keyLength = key_length(page->header.attrType, key);
     int entryCount = page->header.entryCount;
 
-    void *firstKey = page->data;
-    void *lastKey = page + page->header.lastEntryOffset;
+    void *firstKey = (char*)page->data;
+    void *lastKey = (char*)page + page->header.lastEntryOffset;
 
     // key < firstKey
+
     if (compareKey(key, firstKey, page->header.attrType) < 0) {
         countNode = 0;
         return sizeof(IXPageHeader);
@@ -560,11 +577,12 @@ int IndexManager::findInsertOffset(IXPage *page, const void *key, int &countNode
     int offset = sizeof(IXPageHeader);
 
     for (int i = 0; i < entryCount - 1; i++) {
-        void *curKey = page + offset;
+        void *curKey = (char*)page + offset;
         int curKeyLength = key_length(page->header.attrType, curKey);
-        void *nextKey = page + offset + curKeyLength + ridOrPidSize;
+        void *nextKey = (char*)page + offset + curKeyLength + ridOrPidSize;
         //int nextKeyLength = key_length(page->header.attrType, nextKey);
         countNode++;
+
         if (compareKey(curKey, key, page->header.attrType) <= 0 && compareKey(key, nextKey, page->header.attrType) < 0) {
             return offset + curKeyLength + ridOrPidSize;
         }
@@ -630,7 +648,7 @@ IXPage * IndexManager::findLeafPage(IXFileHandle &ixfileHandle, IXPage *page, co
     void* lastKey = page + page->header.lastEntryOffset;
     if (compareKey(key, lastKey, page->header.attrType) >= 0) {
 
-        nextPageNum = *(int*)((char*)page + PAGE_SIZE - sizeof(int));
+        nextPageNum = *(int*)((char*)page + page->header.freeSpaceOffset - sizeof(int));
         ixfileHandle.readPage(nextPageNum, nextPage);
         return findLeafPage(ixfileHandle, nextPage, key);
     }
