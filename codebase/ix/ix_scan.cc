@@ -4,6 +4,7 @@
 
 
 IX_ScanIterator::IX_ScanIterator() {
+    isEOF = false;
     open = false;
 }
 
@@ -17,11 +18,13 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key) {
         if (DEBUG) printf("ixsi is not open!\n");
         return -1;
     }
-    unsigned totalPageNum = ixfh.fileHandle.getNumberOfPages();
-    if (nextEid.pageNum == totalPageNum) {
+
+    if (isEOF) {
         if (DEBUG) printf("EOF is reached\n");
         return -1;
     }
+
+
 
     // fetch the leaf page indicated by the nextEid
     IXPage *targetLeafPage = new IXPage;
@@ -36,7 +39,24 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key) {
         entryNum++;
     }
 
-    // find key length of the target entry
+
+
+    // if highkey == NULL, scan all the records after low key
+    // otherwise check ending condition
+    if (highKey != NULL) {
+        IndexManager *ixm = IndexManager::instance();
+        int cmpResult = ixm->compareKey(entryPtr, highKey, attrType);
+        // entryKey > high key or entryKey == high key but not inclusive, return EOF
+        if (cmpResult > 0 || (cmpResult == 0 && !highKeyInclusive)) {
+            delete targetLeafPage;
+            return IX_EOF;
+        }
+    }
+
+
+
+
+    // find key length of the target entry and copy entry out
     int entryKeyLen = attrType == TypeVarChar ? sizeof(int) + *(int*)entryPtr : sizeof(int);
     memcpy(key, entryPtr, (size_t)entryKeyLen);
     memcpy(&rid, entryPtr + entryKeyLen, sizeof(RID));
@@ -44,6 +64,13 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key) {
 
     nextEid.slotNum++;
     if (nextEid.slotNum == targetLeafPage->header.entryCount) {
+
+        // if this page is the last leaf page, flag IX_EOF, so next call will return EOF
+        if (targetLeafPage->header.nextPageNum == targetLeafPage->header.pageNum) {
+            isEOF = true;
+            delete targetLeafPage;
+            return 0;
+        }
         nextEid.pageNum = targetLeafPage->header.nextPageNum;
         nextEid.slotNum = 0;
     }
@@ -55,7 +82,6 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key) {
 RC IX_ScanIterator::close() {
 
     IndexManager *ixm = IndexManager::instance();
-    ixm->closeFile(ixfh);
     open = false;
     return 0;
 }

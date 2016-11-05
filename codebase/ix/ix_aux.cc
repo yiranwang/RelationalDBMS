@@ -485,6 +485,8 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
 
 }
 
+
+
 // find non leaf page one by one level down
 IXPage* IndexManager::findNextPage(IXFileHandle &ixfileHandle, IXPage *page, const void *key) {
     if (page->header.entryCount == 0) {
@@ -495,7 +497,7 @@ IXPage* IndexManager::findNextPage(IXFileHandle &ixfileHandle, IXPage *page, con
     IXPage *nextPage = new IXPage;
 
     // if key < firstKey, skip
-    void* firstKey = page->data;
+    char* firstKey = page->data;
 
     if (compareKey(key, firstKey, page->header.attrType) < 0) {
 
@@ -608,7 +610,23 @@ int IndexManager::findInsertOffset(IXPage *page, const void *key, int &countNode
 }*/
 
 
+IXPage* IndexManager::findFirstLeafPage(IXFileHandle &ixfileHandle, IXPage *page) {
+    int pageType = page->header.pageType;
 
+    // case 1: input page is a leaf page
+    if (pageType == 1) {
+        if (page->header.entryCount == 0) {
+            unsigned nextPageNum = page->header.nextPageNum;
+            ixfileHandle.readPage(nextPageNum, page);
+            return findFirstLeafPage(ixfileHandle, page);
+        }
+        return page;
+    }
+
+    unsigned nextPageNum = page->header.leftmostPtr;
+    ixfileHandle.readPage(nextPageNum, page);
+    return findFirstLeafPage(ixfileHandle, page);
+}
 
 // search recursively
 IXPage * IndexManager::findLeafPage(IXFileHandle &ixfileHandle, IXPage *page, const void *key) {
@@ -636,7 +654,7 @@ IXPage * IndexManager::findLeafPage(IXFileHandle &ixfileHandle, IXPage *page, co
     IXPage *nextPage = new IXPage;
 
     // if key < firstKey, skip
-    void* firstKey = page->data;
+    void* firstKey = (char*)page + sizeof(IXPageHeader);
     if (compareKey(key, firstKey, page->header.attrType) < 0) {
 
         nextPageNum = page->header.leftmostPtr;
@@ -662,9 +680,9 @@ IXPage * IndexManager::findLeafPage(IXFileHandle &ixfileHandle, IXPage *page, co
     int offset = sizeof(IXPageHeader);
 
     for (int i = 0; i < entryCount - 1; i++) {
-        void* curKey = page + offset;
+        void* curKey = (char*)page + offset;
         int curKeyLength = key_length(page->header.attrType, curKey);
-        void* nextKey = page + offset + curKeyLength + sizeof(int);
+        void* nextKey = (char*)page + offset + curKeyLength + sizeof(int);
 
         if (compareKey(key, curKey, page->header.attrType) >= 0 && compareKey(key, nextKey, page->header.attrType) < 0) {
             nextPageNum = *(int*)(page + offset + curKeyLength);

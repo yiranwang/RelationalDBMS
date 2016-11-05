@@ -77,9 +77,15 @@ public:
 class IX_ScanIterator {
 public:
     bool open;
+    bool isEOF;
     IXFileHandle ixfh;
     AttrType attrType;
     RID nextEid;                // rid of the next data entry
+
+    void    *lowKey;
+    void    *highKey;
+    bool    lowKeyInclusive;
+    bool    highKeyInclusive;
 
 
     // Constructor
@@ -150,6 +156,7 @@ class IndexManager {
 
         RC initializeIndex(IXFileHandle &ixfileHandle, const AttrType attrType);
         IXPage *initializeIXPage(unsigned pageNum, char pageType, AttrType attrType);
+        IXPage *findFirstLeafPage(IXFileHandle &ixfileHandle, IXPage *page);
         IXPage *findLeafPage(IXFileHandle &ixfileHandle, IXPage *page, const void *key);
 
 

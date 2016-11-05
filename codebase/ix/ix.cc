@@ -1,5 +1,6 @@
 
 #include "ix.h"
+#include "../rbf/rbfm.h"
 
 IndexManager* IndexManager::_index_manager = 0;
 
@@ -86,6 +87,28 @@ RC IndexManager::scan(IXFileHandle &ixfileHandle,
     ix_ScanIterator.ixfh = ixfileHandle;
     ix_ScanIterator.attrType = attribute.type;
 
+    // copy lowKey
+    if (!lowKey) {
+        ix_ScanIterator.lowKey = NULL;
+    } else {
+        size_t keyLen = attribute.type == TypeVarChar ? *(int*)lowKey + sizeof(int) : sizeof(int);
+        ix_ScanIterator.lowKey = malloc(keyLen);
+        memcpy(ix_ScanIterator.lowKey, lowKey, keyLen);
+    }
+
+    // copy highKey
+    if (!highKey) {
+        ix_ScanIterator.highKey = NULL;
+    } else {
+        size_t keyLen = attribute.type == TypeVarChar ? *(int*)highKey + sizeof(int) : sizeof(int);
+        ix_ScanIterator.highKey = malloc(keyLen);
+        memcpy(ix_ScanIterator.highKey, highKey, keyLen);
+    }
+
+    ix_ScanIterator.lowKeyInclusive = lowKeyInclusive;
+    ix_ScanIterator.highKeyInclusive = highKeyInclusive;
+
+
 
     // fetch directory page
     IXPage *dirPage = new IXPage;
@@ -96,6 +119,18 @@ RC IndexManager::scan(IXFileHandle &ixfileHandle,
     // fetch root page
     IXPage *rootPage = new IXPage;
     ixfileHandle.readPage(rootPageNum, rootPage);
+
+
+    // fetch first leaf page if lowKey == NULL
+    if (lowKey == NULL) {
+        IXPage *targetLeafPage = findFirstLeafPage(ixfileHandle, rootPage);
+        ix_ScanIterator.nextEid.pageNum = targetLeafPage->header.pageNum;
+        ix_ScanIterator.nextEid.slotNum = 0;
+        delete targetLeafPage;
+        return 0;
+    }
+
+
 
     // fetch the leaf page that MAY contain the data entry
     IXPage *targetLeafPage = findLeafPage(ixfileHandle, rootPage, lowKey);
