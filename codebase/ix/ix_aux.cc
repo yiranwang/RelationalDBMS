@@ -155,12 +155,6 @@ void IndexManager::insertEntryToEmptyRoot(IXFileHandle &ixfileHandle, IXPage *ro
 void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const void *key, const RID &rid,
                               void* &newChildEntry) {
 
-    if (DEBUG) {
-        if (page->header.entryCount >= 169) {
-
-        }
-    }
-
     int pageType = page->header.pageType;
     // if the page to insert is leaf page
     if (pageType == LEAF_PAGE_TYPE) {
@@ -174,19 +168,23 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
         }
 
         int countNode = 0;
-        // find insert offset in page
+        // find insert offset in page(!!!!! don't include IXPageHeader size!!!!!!!!!!)
         int insertOffset = findInsertOffset(page, key, countNode);
-        int restSize = page->header.freeSpaceOffset - insertOffset;
+        int restSize = page->header.freeSpaceOffset - insertOffset - sizeof(IXPageHeader);
 
         // don't split leaf page
         if (!needSplit) {
             // copy the rest leaf nodes to restNodes
             void *restNodes = malloc(restSize);
-            memcpy((char*)restNodes, (char*)page + insertOffset, restSize);
 
-            memcpy((char*)page + insertOffset, key, keyLength);
-            *(RID*)((char*)page + insertOffset + keyLength) = rid;
-            int offset = insertOffset + keyLength + sizeof(RID);
+            int offset = insertOffset + sizeof(IXPageHeader);
+            memcpy((char*)restNodes, (char*)page + offset, restSize);
+
+            memcpy((char*)page + offset, key, keyLength);
+            offset += keyLength;
+
+            *(RID*)((char*)page + offset) = rid;
+            offset += sizeof(RID);
 
             memcpy((char*)page + offset, (char*)restNodes, restSize);
 
@@ -205,21 +203,24 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
             // split leaf page
             // malloc new 2*pagesize space to copy original nodes + new node
 
+            //insertOffset don't include IXPageHeader size!!!!!!!!!!!
             void *doubleSpace = malloc(PAGE_SIZE * 2);
-            int offset = 0;
+            int offsetInDoubleSpace = 0;
+            int offsetInOldPage = sizeof(IXPageHeader);
 
             //copy first part
-            memcpy((char*)doubleSpace, (char*)page, insertOffset);
-            offset += insertOffset;
+            memcpy((char*)doubleSpace + offsetInDoubleSpace, (char*)page + offsetInOldPage, insertOffset);
+            offsetInOldPage += insertOffset;
+            offsetInDoubleSpace += insertOffset;
 
             //copy inserted key
-            memcpy((char*)doubleSpace + offset, key, keyLength);
-            offset += keyLength;
-            *(RID*)((char*)doubleSpace + offset) = rid;
-            offset += sizeof(RID);
+            memcpy((char*)doubleSpace + offsetInDoubleSpace, (char*)key, keyLength);
+            offsetInDoubleSpace += keyLength;
+            *(RID*)((char*)doubleSpace + offsetInDoubleSpace) = rid;
+            offsetInDoubleSpace += sizeof(RID);
 
             //copy rest part
-            memcpy((char*)doubleSpace + offset, (char*)page + insertOffset, restSize);
+            memcpy((char*)doubleSpace + offsetInDoubleSpace, (char*)page + offsetInOldPage, restSize);
 
             int allEntryCount = page->header.entryCount + 1;
             int halfEntryCount = allEntryCount / 2;
@@ -313,25 +314,30 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
         int countNode = 0;
         // count the first half entry
 
+        // !!!!!insertOffset don't include IXPageHeader size!!!!!!!!!!!!!!
         int insertOffset = findInsertOffset(page, key, countNode);
-        int restSize = page->header.freeSpaceOffset - insertOffset;
+        int restSize = page->header.freeSpaceOffset - insertOffset - sizeof(IXPageHeader);
 
         // if no split
         if (!needSplit) {
+            int offset = sizeof(IXPageHeader);
 
             void *restNodes = malloc(restSize);
 
             // copy rest part to restNodes
-            memcpy((char*)restNodes, (char*)page + insertOffset, restSize);
+            memcpy((char*)restNodes, (char*)page + offset + insertOffset, restSize);
+
+            offset += insertOffset;
 
             // copy newChildEntry to page
             int newChildEntryKeyLength = key_length(page->header.attrType, newChildEntry);
-            memcpy((char*)page + insertOffset, (char*)newChildEntry, newChildEntryKeyLength);
-            *(int*)((char*)page + insertOffset + newChildEntryKeyLength) = *(int*)((char*)newChildEntry +
-                                                                                       newChildEntryKeyLength);
+            memcpy((char*)page + offset, (char*)newChildEntry, newChildEntryKeyLength);
+            offset += newChildEntryKeyLength;
+
+            *(int*)((char*)page + offset) = *(int*)((char*)newChildEntry + newChildEntryKeyLength);
+            offset += sizeof(int);
 
             // copy rest nodes from restNodes to page
-            int offset = insertOffset + newChildEntryKeyLength + sizeof(int);
             memcpy((char*)page + offset, (char*)restNodes, restSize);
 
             // adjust freespace, entrycount, lastEntryOffset in page
@@ -356,20 +362,23 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
             //malloc new space to copy original page + inserted key
             void *doubleSpace = malloc(PAGE_SIZE * 2);
 
-            int offset = 0;  // offset in doubleSpace
+            int offsetInOldPage = sizeof(IXPageHeader);
+            int offsetInDoubleSpace = 0;  // offset in doubleSpace
             // copy first half
-            memcpy((char*)doubleSpace + offset, (char*)page, insertOffset);
-            offset += insertOffset;
+            memcpy((char*)doubleSpace + offsetInDoubleSpace, (char*)page + offsetInOldPage, insertOffset);
+            offsetInOldPage += insertOffset;
+            offsetInDoubleSpace += insertOffset;
 
             // copy newChildEntry
             int newChildEntryKeyLength = key_length(page->header.attrType, newChildEntry);
-            memcpy((char*)doubleSpace + offset, (char*)newChildEntry, newChildEntryKeyLength);
-            offset += newChildEntryKeyLength;
-            *(int*)((char*)doubleSpace + offset) = *(int*)((char*)newChildEntry + newChildEntryKeyLength);
-            offset += sizeof(int);
+            memcpy((char*)doubleSpace + offsetInDoubleSpace, (char*)newChildEntry, newChildEntryKeyLength);
+            offsetInDoubleSpace += newChildEntryKeyLength;
+
+            *(int*)((char*)doubleSpace + offsetInDoubleSpace) = *(int*)((char*)newChildEntry + newChildEntryKeyLength);
+            offsetInDoubleSpace += sizeof(int);
 
             //copy another half
-            memcpy((char*)doubleSpace + offset, (char*)page + insertOffset, restSize);
+            memcpy((char*)doubleSpace + offsetInDoubleSpace, (char*)page + offsetInOldPage, restSize);
 
             //calculate the offset of the first half, prevOffset is used to record the lastEntry offset
             int firstHalfOffset = 0;
@@ -544,11 +553,11 @@ IXPage* IndexManager::findNextPage(IXFileHandle &ixfileHandle, IXPage *page, con
     return NULL;
 }
 
-//find insert offset within a page
+//find insert offset within a page(!!!!! don't include IXPageHeader size!!!!!!!!!!)
 int IndexManager::findInsertOffset(IXPage *page, const void *key, int &countNode) {
 
     if (page->header.entryCount == 0) {
-        return sizeof(IXPageHeader);
+        return 0;
     }
 
     int ridOrPidSize = 0;
@@ -569,13 +578,13 @@ int IndexManager::findInsertOffset(IXPage *page, const void *key, int &countNode
 
     if (compareKey(key, firstKey, page->header.attrType) < 0) {
         countNode = 0;
-        return sizeof(IXPageHeader);
+        return 0;
     }
 
     //key >= lastKey
     if (compareKey(key, lastKey, page->header.attrType) >= 0) {
         countNode = entryCount;
-        return page->header.freeSpaceOffset;
+        return page->header.freeSpaceOffset - sizeof(IXPageHeader);
     }
 
     int offset = sizeof(IXPageHeader);
@@ -588,7 +597,7 @@ int IndexManager::findInsertOffset(IXPage *page, const void *key, int &countNode
         countNode++;
 
         if (compareKey(curKey, key, page->header.attrType) <= 0 && compareKey(key, nextKey, page->header.attrType) < 0) {
-            return offset + curKeyLength + ridOrPidSize;
+            return offset + curKeyLength + ridOrPidSize - sizeof(IXPageHeader);
         }
         offset += curKeyLength + ridOrPidSize;
     }

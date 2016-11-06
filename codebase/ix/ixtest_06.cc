@@ -38,7 +38,7 @@ int testCase_6(const string &indexFileName, const Attribute &attribute)
     assert(rc == success && "indexManager::openFile() should not fail.");
 
     // insert entries
-    for(unsigned i = 0; i <= numOfTuples; i++)
+    for(unsigned i = 0; i <= 500; i++)
     {
         key = i; 
         rid.pageNum = key;
@@ -49,6 +49,8 @@ int testCase_6(const string &indexFileName, const Attribute &attribute)
 
         inRidSlotNumSum += rid.slotNum;
     }
+
+    indexManager->printBtree(ixfileHandle, attribute);
 
     // Scan
     rc = indexManager->scan(ixfileHandle, attribute, NULL, NULL, true, true, ix_ScanIterator);
