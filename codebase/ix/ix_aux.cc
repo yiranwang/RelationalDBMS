@@ -253,12 +253,12 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
 
 
 
-            //compose newChildEntry that will be returned
+            // compose newChildEntry that will be returned
             // (COPY UP) newChildEntry : key + PID
             int returnedKeyLength = key_length(page->header.attrType, (char*)doubleSpace + firstHalfOffset);
-            void *willReturn = malloc(returnedKeyLength + sizeof(int));
+            void *willReturn = malloc(returnedKeyLength + sizeof(unsigned));
             memcpy((char*)willReturn, (char*)doubleSpace + firstHalfOffset, returnedKeyLength);
-            *(int*)((char*)willReturn + returnedKeyLength) = ixfileHandle.fileHandle.getNumberOfPages();
+            *(unsigned*)((char*)willReturn + returnedKeyLength) = ixfileHandle.fileHandle.getNumberOfPages();
             if (newChildEntry) {
                 free(newChildEntry);
             }
@@ -290,11 +290,11 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
             newPage->header.leftmostPtr = 0;
             newPage->header.prevPageNum = page->header.pageNum;
 
-            // current page is the last page
+            // if current page is the last page
             if (page->header.nextPageNum == page->header.pageNum) {
                 newPage->header.nextPageNum = newPage->header.pageNum;
             }else {
-                //current page is not the last page
+            // if current page is not the last page
                 newPage->header.nextPageNum = page->header.nextPageNum;
             }
             newPage->header.parent = page->header.parent;
@@ -538,13 +538,13 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
 
 // find the next child non leaf page one by one level down
 IXPage* IndexManager::findNextPage(IXFileHandle &ixfileHandle, IXPage *page, const void *key) {
+    IXPage *nextPage = new IXPage;
     if (page->header.entryCount == 0) {
-        return page;
+        memcpy(nextPage, page, PAGE_SIZE);
+        return nextPage;
     }
 
     int nextPageNum = 0;
-    IXPage *nextPage = new IXPage;
-
     // if key < firstKey, skip
     char* firstKey = (char*)page + sizeof(IXPageHeader);
 
