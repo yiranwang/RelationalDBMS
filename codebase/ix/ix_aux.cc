@@ -345,8 +345,10 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
 
         // case 2.2.1: if no need to split this index page
         if (!needSplit) {
+
             // used for adjusting lastEntryOffset
             int prevLastEntryLength = key_length(page->header.attrType, (char*)page + page->header.lastEntryOffset) + sizeof(unsigned);
+
 
             // copy rest part out to restNodes
             int offset = sizeof(IXPageHeader) + insertOffset;
@@ -354,9 +356,11 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
             memcpy((char*)restNodes, (char*)page + offset, restSize);
 
             // insert newChildEntry to page
+
             int newChildEntryLength = key_length(page->header.attrType, newChildEntry) + sizeof(unsigned);
             memcpy((char*)page + offset, (char*)newChildEntry, newChildEntryLength);
             offset += newChildEntryLength;
+
 
             // copy rest nodes from restNodes back to page
             memcpy((char*)page + offset, (char*)restNodes, restSize);
@@ -523,9 +527,6 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
             ixfileHandle.writePage(page->header.pageNum, page);
             //ixfileHandle.writePage(newPage->header.pageNum, newPage);
 
-            if (page->header.pageNum == 5 || newPage->header.pageNum == 5) {
-
-            }
 
             //free(newChildEntry);
             //free(willReturn);
