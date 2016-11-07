@@ -423,10 +423,7 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
 
             void *willReturn = malloc(returnedKeyLength + sizeof(unsigned));
             memcpy((char*)willReturn, (char*)doubleSpace + totalOffset, returnedKeyLength + sizeof(unsigned));
-            if (newChildEntry) {
-                free(newChildEntry);
-            }
-            newChildEntry = willReturn;
+
 
             totalOffset += returnedKeyLength + sizeof(unsigned);
             int secondHalfBeginOffset = totalOffset;
@@ -447,7 +444,7 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
             memcpy(newPage->data, (char*)doubleSpace + secondHalfBeginOffset, totalOffset - secondHalfBeginOffset);
 
             //modify header of new page--------------------
-            newPage->header.entryCount = allEntryCount - halfEntryCount;
+            newPage->header.entryCount = allEntryCount - halfEntryCount - 1;
             newPage->header.pageType = INDEX_PAGE_TYPE;
             newPage->header.attrType = page->header.attrType;
             newPage->header.freeSpaceOffset = sizeof(IXPageHeader) + totalOffset - firstHalfOffset;
@@ -461,6 +458,13 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
             newPage->header.isRoot = false;
 
             ixfileHandle.appendPage(newPage);
+
+            // newChildEntry's pointer to newPage
+            if (newChildEntry) {
+                free(newChildEntry);
+            }
+            *(unsigned *)((char*)willReturn + returnedKeyLength) = newPage->header.pageNum;
+            newChildEntry = willReturn;
 
 
             //modify header of the original page ------------------------
@@ -477,7 +481,7 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
                 printf("Splitting root page:%u...\n", page->header.pageNum);
 
                 // insert newChildEntry into new root page
-                unsigned newChildEntryLength = newChildEntryKeyLength + sizeof(unsigned);
+                unsigned newChildEntryLength = returnedKeyLength + sizeof(unsigned);
                 memcpy(newRootPage->data, (char*)newChildEntry, newChildEntryLength);
 
                 newRootPage->header.leftmostPtr = page->header.pageNum;
@@ -504,8 +508,9 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
                 dirPage->header.leftmostPtr = newRootPage->header.pageNum;
                 ixfileHandle.writePage(0, dirPage);
 
-
                 printf("************ Splitted a root: pageNum = %u!\n",page->header.pageNum );
+
+                free(newChildEntry);
 
                 delete(newRootPage);
                 delete(dirPage);
@@ -514,7 +519,7 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
             ixfileHandle.writePage(page->header.pageNum, page);
             ixfileHandle.writePage(newPage->header.pageNum, newPage);
 
-            free(newChildEntry);
+            //free(newChildEntry);
             //free(willReturn);
             free(doubleSpace);
             delete(newPage);
