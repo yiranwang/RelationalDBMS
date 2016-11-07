@@ -6,6 +6,7 @@
 
 #include "ix.h"
 #include "ix_test_util.h"
+#include "../rbf/rbfm.h"
 
 IndexManager *indexManager;
 
@@ -84,8 +85,10 @@ int testCase_9(const string &indexFileName, const Attribute &attribute) {
         outRidSlotNumSum += rid.slotNum;
     }
 
+
     // Inconsistency between input and output?
     if (inRidSlotNumSum != outRidSlotNumSum) {
+        printf("inRid: %d, outRid: %d, diff: %d\n", inRidSlotNumSum, outRidSlotNumSum, inRidSlotNumSum - outRidSlotNumSum);
         cerr << "Wrong entries output... The test failed" << endl;
         rc = ix_ScanIterator.close();
         rc = indexManager->closeFile(ixfileHandle);

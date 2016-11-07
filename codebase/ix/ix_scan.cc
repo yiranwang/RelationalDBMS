@@ -21,7 +21,7 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key) {
 
     if (isEOF) {
         if (DEBUG) printf("EOF is reached\n");
-        return -1;
+        return IX_EOF;
     }
 
 
@@ -52,9 +52,6 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key) {
             return IX_EOF;
         }
     }
-
-
-
 
     // find key length of the target entry and copy entry out
     int entryKeyLen = attrType == TypeVarChar ? sizeof(int) + *(int*)entryPtr : sizeof(int);

@@ -27,7 +27,7 @@ int testCase_6(const string &indexFileName, const Attribute &attribute)
     unsigned key;
     int inRidSlotNumSum = 0;
     int outRidSlotNumSum = 0;
-    unsigned numOfTuples = 500;
+    unsigned numOfTuples = 1000;
 
     // create index file
     RC rc = indexManager->createFile(indexFileName);
@@ -50,7 +50,8 @@ int testCase_6(const string &indexFileName, const Attribute &attribute)
         inRidSlotNumSum += rid.slotNum;
     }
 
-    //indexManager->printBtree(ixfileHandle, attribute);
+
+
 
     // Scan
     rc = indexManager->scan(ixfileHandle, attribute, NULL, NULL, true, true, ix_ScanIterator);
@@ -62,7 +63,6 @@ int testCase_6(const string &indexFileName, const Attribute &attribute)
     {
         count++;
 
-        cerr << count << " - Returned rid: " << rid.pageNum << " " << rid.slotNum << endl;
         if (rid.pageNum % 200 == 0) {
             cerr << count << " - Returned rid: " << rid.pageNum << " " << rid.slotNum << endl;
         }
@@ -83,6 +83,45 @@ int testCase_6(const string &indexFileName, const Attribute &attribute)
     rc = ix_ScanIterator.close();
     assert(rc == success && "IX_ScanIterator::close() should not fail.");
 
+
+
+
+
+    indexManager->printBtree(ixfileHandle, attribute);
+
+
+    printf("There are %u pages.\n", ixfileHandle.fileHandle.getNumberOfPages());
+
+    IXPage *dirPage = new IXPage;
+    ixfileHandle.readPage(0, dirPage);
+    unsigned rootPageNum = dirPage->header.leftmostPtr;
+    printf("Root page num is: %u\n", rootPageNum);
+    delete dirPage;
+
+    IXPage *rootPage = new IXPage;
+    ixfileHandle.readPage(rootPageNum, rootPage);
+    printf("rootpage->leftmostPtr is: %u\n", rootPage->header.leftmostPtr);
+    printf("There are %u entries on rootPage:\n", rootPage->header.entryCount);
+    char *entryPtr = rootPage->data;
+    for (unsigned i = 0; i < rootPage->header.entryCount; i++) {
+        printf("%d\t", *(int*)entryPtr);
+        entryPtr += 8;
+    }
+
+
+    IXPage *firstPage = new IXPage;
+    ixfileHandle.readPage(rootPage->header.leftmostPtr, firstPage);
+    printf("firstpage->leftmostPtr is: %u\n", firstPage->header.leftmostPtr);
+    printf("There are %u entries on rootPage:\n", rootPage->header.entryCount);
+    char *entryPtr = rootPage->data;
+    for (unsigned i = 0; i < rootPage->header.entryCount; i++) {
+        printf("%d\t", *(int*)entryPtr);
+        entryPtr += 8;
+    }
+
+
+    delete rootPage;
+    delete firstPage;
     // Close Index
     rc = indexManager->closeFile(ixfileHandle);
     assert(rc == success && "indexManager::closeFile() should not fail.");
