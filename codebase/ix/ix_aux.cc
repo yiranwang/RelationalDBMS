@@ -743,6 +743,9 @@ void IndexManager::DFSPrintBTree(int pageNum, IXFileHandle &ixfileHandle, const 
             vector<int> keys;
             vector<int> pids;
 
+            int leftMostPid = page->header.leftmostPtr;
+            pids.push_back(leftMostPid);
+
             int offset = sizeof(IXPageHeader);
             for (int i = 0; i < entryCount; i++) {
                 int key = *(int*)((char*)page + offset);
@@ -816,6 +819,9 @@ void IndexManager::DFSPrintBTree(int pageNum, IXFileHandle &ixfileHandle, const 
         if (page->header.pageType == INDEX_PAGE_TYPE) {
             vector<float> keys;
             vector<int> pids;
+
+            int leftMostPid = page->header.leftmostPtr;
+            pids.push_back(leftMostPid);
 
             int offset = sizeof(IXPageHeader);
             for (int i = 0; i < entryCount; i++) {
@@ -893,6 +899,9 @@ void IndexManager::DFSPrintBTree(int pageNum, IXFileHandle &ixfileHandle, const 
         if (page->header.pageType == INDEX_PAGE_TYPE) {
             vector<string> keys;
             vector<int> pids;
+
+            int leftMostPid = page->header.leftmostPtr;
+            pids.push_back(leftMostPid);
 
             int offset = sizeof(IXPageHeader);
             for (int i = 0; i < entryCount; i++) {
