@@ -218,7 +218,7 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
         }
         // case 1.2: not enough space in leaf page, need to split this leaf page
         else {
-            printf("Splitting a leaf...\n");
+            if (DEBUG) printf("Splitting a leaf...\n");
             // split leaf page
             // malloc new 2*pagesize space to copy original nodes + new node, no page header included
 
@@ -486,7 +486,7 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
             if (page->header.isRoot) {
                 IXPage *newRootPage = new IXPage;
 
-                printf("Splitting root page:%u...\n", page->header.pageNum);
+                if (DEBUG) printf("Splitting root page:%u...\n", page->header.pageNum);
 
                 // insert newChildEntry into new root page
                 unsigned newChildEntryLength = returnedKeyLength + sizeof(unsigned);
@@ -516,8 +516,7 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
                 dirPage->header.leftmostPtr = newRootPage->header.pageNum;
                 ixfileHandle.writePage(0, dirPage);
 
-                printf("************ Splitted a root: pageNum = %u!\n",page->header.pageNum );
-                //printf("It's left child page num is: %u\n", );
+                if (DEBUG) printf("************ Splitted a root: pageNum = %u!\n",page->header.pageNum );
 
                 free(newChildEntry);
                 newChildEntry = NULL;
@@ -684,14 +683,6 @@ IXPage * IndexManager::findLeafPage(IXFileHandle &ixfileHandle, IXPage *page, co
         return page;
     }
 
-    // case 2: no leaf pages yet, create an empty one and return it
-    /*if (page->header.entryCount == 0) {
-        IXPage *leafPage = initializeIXPage(2, LEAF_PAGE_TYPE, indexPage->header.attrType);
-        insertDataEntryToLeafPage(leafPage, key, rid);
-        leafPage->header.entryCount++;
-        ixfileHandle.appendPage(leafPage);
-        return leafPage;
-    }*/
 
     // case 2: input page is an index page
     // case 2: compare the keys sequentially
@@ -711,7 +702,7 @@ IXPage * IndexManager::findLeafPage(IXFileHandle &ixfileHandle, IXPage *page, co
     }
 
     // if key >= lastKey, skip
-    void* lastKey = page + page->header.lastEntryOffset;
+    void* lastKey = (char*)page + page->header.lastEntryOffset;
     if (compareKey(key, lastKey, page->header.attrType) >= 0) {
 
         nextPageNum = *(int*)((char*)page + page->header.freeSpaceOffset - sizeof(int));

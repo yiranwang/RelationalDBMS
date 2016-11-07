@@ -111,8 +111,6 @@ RC IndexManager::scan(IXFileHandle &ixfileHandle,
     ix_ScanIterator.lowKeyInclusive = lowKeyInclusive;
     ix_ScanIterator.highKeyInclusive = highKeyInclusive;
 
-
-
     // fetch directory page
     IXPage *dirPage = new IXPage;
     ixfileHandle.readPage(0, dirPage);
