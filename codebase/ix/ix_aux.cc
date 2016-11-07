@@ -297,7 +297,7 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
             // if current page is not the last page
                 newPage->header.nextPageNum = page->header.nextPageNum;
             }
-            newPage->header.parent = page->header.parent;
+            //newPage->header.parent = page->header.parent;
             newPage->header.lastEntryOffset = prevTotalOffset - firstHalfOffset + sizeof(IXPageHeader);
             newPage->header.pageType = LEAF_PAGE_TYPE;
             newPage->header.isRoot = false;
@@ -331,7 +331,7 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
             return;
         }
 
-        // case 2.2: child is split, must insert newchildentry
+        // case 2.2: child is split, must insert newchildentry <key, PID>
         int keyLength = key_length(page->header.attrType, key);
         int insertSize = keyLength + sizeof(unsigned);
         bool needSplit = page->header.freeSpaceSize - insertSize < 0;
@@ -345,39 +345,38 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
 
         // case 2.2.1: if no need to split this index page
         if (!needSplit) {
-            int offset = sizeof(IXPageHeader) + insertOffset;
+            // used for adjusting lastEntryOffset
+            int prevLastEntryLength = key_length(page->header.attrType, (char*)page + page->header.lastEntryOffset);
 
             // copy rest part out to restNodes
+            int offset = sizeof(IXPageHeader) + insertOffset;
             void *restNodes = malloc(restSize);
             memcpy((char*)restNodes, (char*)page + offset, restSize);
 
             // insert newChildEntry to page
-            // insert newCHildEntry's key
-            int newChildEntryKeyLength = key_length(page->header.attrType, newChildEntry);
-            memcpy((char*)page + offset, (char*)newChildEntry, newChildEntryKeyLength);
-            offset += newChildEntryKeyLength;
-
-            // insert newChildEntry's PID
-            *(unsigned*)((char*)page + offset) = *(unsigned*)((char*)newChildEntry + newChildEntryKeyLength);
-            offset += sizeof(unsigned);
+            int newChildEntryLength = key_length(page->header.attrType, newChildEntry) + sizeof(unsigned);
+            memcpy((char*)page + offset, (char*)newChildEntry, newChildEntryLength);
+            offset += newChildEntryLength;
 
             // copy rest nodes from restNodes back to page
             memcpy((char*)page + offset, (char*)restNodes, restSize);
+            free(restNodes);
+
+
+            int lastEntryOffsetAdjust = countNode == page->header.entryCount ? prevLastEntryLength : newChildEntryLength;
+            page->header.lastEntryOffset += lastEntryOffsetAdjust;
 
             // adjust freespace, entrycount, lastEntryOffset in page
             page->header.entryCount += 1;
-            page->header.freeSpaceSize -= newChildEntryKeyLength + sizeof(unsigned);
-            page->header.freeSpaceOffset += newChildEntryKeyLength + sizeof(unsigned);
-
-            int prevLastEntryLength = key_length(page->header.attrType, (char*)page + page->header.lastEntryOffset);
-            page->header.lastEntryOffset += prevLastEntryLength + sizeof(unsigned);
+            page->header.freeSpaceSize -= newChildEntryLength;
+            page->header.freeSpaceOffset += newChildEntryLength;
 
             free(newChildEntry);
             newChildEntry = NULL;
 
             ixfileHandle.writePage(page->header.pageNum, page);
 
-            free(restNodes);
+
 
         }
         // case 2.2.2: need to split this index page

@@ -27,7 +27,7 @@ int testCase_6(const string &indexFileName, const Attribute &attribute)
     unsigned key;
     int inRidSlotNumSum = 0;
     int outRidSlotNumSum = 0;
-    unsigned numOfTuples = 3;
+    unsigned numOfTuples = 10;
 
     // create index file
     RC rc = indexManager->createFile(indexFileName);
@@ -87,7 +87,7 @@ int testCase_6(const string &indexFileName, const Attribute &attribute)
 
 
 
-    //indexManager->printBtree(ixfileHandle, attribute);
+    indexManager->printBtree(ixfileHandle, attribute);
 
 
     printf("There are %u pages.\n", ixfileHandle.fileHandle.getNumberOfPages());
@@ -124,13 +124,13 @@ int testCase_6(const string &indexFileName, const Attribute &attribute)
 
     IXPage *firstPage = new IXPage;
     ixfileHandle.readPage(rootPage->header.leftmostPtr, firstPage);
-    //printf("firstPage->leftmostPtr is: %u\n", firstPage->header.leftmostPtr);
+
     printf("Type of firstPage is %d\n", firstPage->header.pageType);
-    printf("There are %u entries on firstPage:\n", firstPage->header.entryCount);
+    printf("There are %u entries on first root's child:\n", firstPage->header.entryCount);
     entryPtr = firstPage->data;
     for (unsigned i = 0; i < firstPage->header.entryCount; i++) {
         printf("%d\t", *(int*)entryPtr);
-        entryPtr += 8;
+        entryPtr += firstPage->header.pageType == LEAF_PAGE_TYPE ? 12 : 8;
     }
     printf("\n");
 
@@ -141,11 +141,11 @@ int testCase_6(const string &indexFileName, const Attribute &attribute)
     ixfileHandle.readPage(lastPageNum, lastPage);
     printf("lastPageNum is: %u\n", lastPageNum);
     printf("Type of lastPage is %d\n", lastPage->header.pageType);
-    printf("There are %u entries on lastPage:\n", lastPage->header.entryCount);
+    printf("There are %u entries on last root child:\n", lastPage->header.entryCount);
     entryPtr = lastPage->data;
     for (unsigned i = 0; i < lastPage->header.entryCount; i++) {
         printf("%d\t", *(int*)entryPtr);
-        entryPtr += 8;
+        entryPtr += lastPage->header.pageType == LEAF_PAGE_TYPE ? 12 : 8;
     }
     printf("\n");
 

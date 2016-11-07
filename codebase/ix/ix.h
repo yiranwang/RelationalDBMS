@@ -20,7 +20,7 @@
 typedef struct {
 
     unsigned pageNum;
-    unsigned parent;                // parent index
+    unsigned parent;                // parent index             NOT MAINTAINED !!!
     unsigned leftmostPtr;           // leftmost pointer; when this is a directory page, it's used to point to root page
     unsigned prevPageNum;           // double linked list only used in leaf page
     unsigned nextPageNum;
