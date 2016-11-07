@@ -107,18 +107,19 @@ int testCase_6(const string &indexFileName, const Attribute &attribute)
         printf("%d\t", *(int*)entryPtr);
         entryPtr += 8;
     }
+    printf("\n");
 
 
     IXPage *firstPage = new IXPage;
     ixfileHandle.readPage(rootPage->header.leftmostPtr, firstPage);
     printf("firstpage->leftmostPtr is: %u\n", firstPage->header.leftmostPtr);
-    printf("There are %u entries on rootPage:\n", rootPage->header.entryCount);
-    char *entryPtr = rootPage->data;
-    for (unsigned i = 0; i < rootPage->header.entryCount; i++) {
+    printf("There are %u entries on firstPage:\n", firstPage->header.entryCount);
+    entryPtr = firstPage->data;
+    for (unsigned i = 0; i < firstPage->header.entryCount; i++) {
         printf("%d\t", *(int*)entryPtr);
         entryPtr += 8;
     }
-
+    printf("\n");
 
     delete rootPage;
     delete firstPage;
