@@ -27,7 +27,7 @@ int testCase_6(const string &indexFileName, const Attribute &attribute)
     unsigned key;
     int inRidSlotNumSum = 0;
     int outRidSlotNumSum = 0;
-    unsigned numOfTuples = 1000;
+    unsigned numOfTuples = 3;
 
     // create index file
     RC rc = indexManager->createFile(indexFileName);
@@ -109,7 +109,7 @@ int testCase_6(const string &indexFileName, const Attribute &attribute)
         printf("This page claims it's NOT root!\n");
     }
 
-    printf("rootpage->leftmostPtr is: %u\n", rootPage->header.leftmostPtr);
+    //printf("rootPage->leftmostPtr is: %u\n", rootPage->header.leftmostPtr);
     printf("There are %u entries on rootPage:\n", rootPage->header.entryCount);
     char *entryPtr = rootPage->data;
     for (unsigned i = 0; i < rootPage->header.entryCount; i++) {

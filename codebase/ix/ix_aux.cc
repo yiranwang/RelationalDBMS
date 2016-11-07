@@ -177,35 +177,38 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
 
         // case 1.1: enough space in leaf page, so no need to split leaf page
         if (!needSplit) {
-            // copy the rest leaf nodes to restNodes
-            void *restNodes = malloc((size_t)restSize);
+            // used for adjusting lastEntryOffset
+            int prevLastEntryLength =  key_length(page->header.attrType, (char*)page + page->header.lastEntryOffset) + sizeof(RID);
 
+            // insert the data entry
+            void *restNodes = malloc((size_t)restSize);
             int offset = insertOffset + sizeof(IXPageHeader);
             memcpy(restNodes, (char*)page + offset, (size_t)restSize);
 
-
             memcpy((char*)page + offset, key, (size_t)keyLength);
-
             offset += keyLength;
 
             *(RID*)((char*)page + offset) = rid;
             offset += sizeof(RID);
 
             memcpy((char*)page + offset, (char*)restNodes, (size_t)restSize);
+            free(restNodes);
 
-            //modify freespace and entryCount;
+            // if inserted data entry is the last one, shift lastEntryOffset to the right by lastEntryLength
+            // otherwise shift it to the right by inserted entry's length
+
+            int lastEntryOffsetAdjust = countNode == page->header.entryCount ? prevLastEntryLength : keyLength + sizeof(RID);
+
+            page->header.lastEntryOffset += lastEntryOffsetAdjust;
+
             page->header.entryCount++;
             page->header.freeSpaceSize -= (keyLength + sizeof(RID));
             page->header.freeSpaceOffset += keyLength + sizeof(RID);
-
-            int prevLastEntryLength = key_length(page->header.attrType, (char*)page + page->header.lastEntryOffset);
-            page->header.lastEntryOffset += prevLastEntryLength + sizeof(RID);
 
             newChildEntry = NULL;
 
             ixfileHandle.writePage(page->header.pageNum, page);
 
-            free(restNodes);
         }
         // case 1.2: not enough space in leaf page, need to split this leaf page
         else {
@@ -239,7 +242,7 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
             int allEntryCount = page->header.entryCount + 1;
             int halfEntryCount = allEntryCount / 2;
 
-            //calculate the offset of the first half, prevOffset is used to record the lastEntry offset
+            // calculate the offset of the first half, prevOffset is used to record the lastEntry offset
             int firstHalfOffset = 0;                // offset of the second half's starting address (inside page->data)
             int prevFirstHalfOffset = 0;            // offset of the last entry in the first half (inside page->data)
             for (int i = 0; i < halfEntryCount; i++) {
@@ -509,6 +512,7 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
                 ixfileHandle.writePage(0, dirPage);
 
                 printf("************ Splitted a root: pageNum = %u!\n",page->header.pageNum );
+                //printf("It's left child page num is: %u\n", );
 
                 free(newChildEntry);
 

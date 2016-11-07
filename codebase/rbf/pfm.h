@@ -6,7 +6,7 @@ typedef int RC;
 typedef char byte;
 
 #define DEBUG 0
-#define PAGE_SIZE 400//4096
+#define PAGE_SIZE 52//4096
 #define HEADER_SIZE 96
 #define DATA_SIZE 4000
 
