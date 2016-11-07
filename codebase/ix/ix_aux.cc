@@ -346,7 +346,7 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
         // case 2.2.1: if no need to split this index page
         if (!needSplit) {
             // used for adjusting lastEntryOffset
-            int prevLastEntryLength = key_length(page->header.attrType, (char*)page + page->header.lastEntryOffset);
+            int prevLastEntryLength = key_length(page->header.attrType, (char*)page + page->header.lastEntryOffset) + sizeof(unsigned);
 
             // copy rest part out to restNodes
             int offset = sizeof(IXPageHeader) + insertOffset;

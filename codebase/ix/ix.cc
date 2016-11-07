@@ -49,7 +49,7 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
     int rootPageNumber = dirPage->header.leftmostPtr;
 
     IXPage *rootPage = new IXPage;
-    ixfileHandle.readPage(dirPage->header.leftmostPtr, rootPage);
+    ixfileHandle.readPage(rootPageNumber, rootPage);
 
     delete(dirPage);
 

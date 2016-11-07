@@ -37,6 +37,8 @@ int testCase_6(const string &indexFileName, const Attribute &attribute)
     rc = indexManager->openFile(indexFileName, ixfileHandle);
     assert(rc == success && "indexManager::openFile() should not fail.");
 
+    printf("IXPageHeader size is %u\n", sizeof(IXPageHeader));
+
     // insert entries
     for(unsigned i = 0; i <= numOfTuples; i++)
     {
@@ -44,6 +46,7 @@ int testCase_6(const string &indexFileName, const Attribute &attribute)
         rid.pageNum = key;
         rid.slotNum = key * 3;
 
+        printf("inserting %u...\n", i);
         rc = indexManager->insertEntry(ixfileHandle, attribute, &key, rid);
         assert(rc == success && "indexManager::insertEntry() should not fail.");
 
