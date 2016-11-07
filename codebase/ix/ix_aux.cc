@@ -349,7 +349,7 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
 
             // copy rest part out to restNodes
             void *restNodes = malloc(restSize);
-            memcpy((char*)restNodes, (char*)page + offset + insertOffset, restSize);
+            memcpy((char*)restNodes, (char*)page + offset, restSize);
 
             // insert newChildEntry to page
             // insert newCHildEntry's key
@@ -450,8 +450,8 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
             newPage->header.entryCount = allEntryCount - halfEntryCount - 1;
             newPage->header.pageType = INDEX_PAGE_TYPE;
             newPage->header.attrType = page->header.attrType;
-            newPage->header.freeSpaceOffset = sizeof(IXPageHeader) + totalOffset - firstHalfOffset;
-            newPage->header.freeSpaceSize = PAGE_SIZE - (totalOffset - firstHalfOffset) - sizeof(IXPageHeader);
+            newPage->header.freeSpaceOffset = sizeof(IXPageHeader) + totalOffset - secondHalfBeginOffset;
+            newPage->header.freeSpaceSize = PAGE_SIZE - (totalOffset - secondHalfBeginOffset) - sizeof(IXPageHeader);
             newPage->header.pageNum = ixfileHandle.fileHandle.getNumberOfPages();
             newPage->header.leftmostPtr = returnedPID;
             newPage->header.prevPageNum = 0;
@@ -466,7 +466,7 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
             if (newChildEntry) {
                 free(newChildEntry);
             }
-            *(unsigned *)((char*)willReturn + returnedKeyLength) = newPage->header.pageNum;
+            *(unsigned*)((char*)willReturn + returnedKeyLength) = newPage->header.pageNum;
             newChildEntry = willReturn;
 
 
@@ -515,13 +515,18 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
                 //printf("It's left child page num is: %u\n", );
 
                 free(newChildEntry);
+                newChildEntry = NULL;
 
                 delete(newRootPage);
                 delete(dirPage);
             }
 
             ixfileHandle.writePage(page->header.pageNum, page);
-            ixfileHandle.writePage(newPage->header.pageNum, newPage);
+            //ixfileHandle.writePage(newPage->header.pageNum, newPage);
+
+            if (page->header.pageNum == 5 || newPage->header.pageNum == 5) {
+
+            }
 
             //free(newChildEntry);
             //free(willReturn);

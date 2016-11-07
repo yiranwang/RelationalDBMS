@@ -46,8 +46,12 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
     IXPage *dirPage = new IXPage;
     ixfileHandle.readPage(0, dirPage);
 
+    int rootPageNumber = dirPage->header.leftmostPtr;
+
     IXPage *rootPage = new IXPage;
     ixfileHandle.readPage(dirPage->header.leftmostPtr, rootPage);
+
+    delete(dirPage);
 
     if (rootPage->header.entryCount == 0) {
 
@@ -59,7 +63,7 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
         insertTree(ixfileHandle, rootPage, key, rid, newChildEntry);
     }
 
-    delete(dirPage);
+
     delete(rootPage);
 
     return 0;
