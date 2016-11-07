@@ -783,13 +783,21 @@ void IndexManager::DFSPrintBTree(int pageNum, IXFileHandle &ixfileHandle, const 
             cout << "\"children\": [" << endl;
 
             for (int i = 0; i < pids.size(); i++) {
-                if (i != 0) {
-                    cout << "," << endl;
-                }
-                DFSPrintBTree(pids[i], ixfileHandle, attribute);
-                cout << "]}";
-            }
+                IXPage *nextPage = new IXPage;
+                ixfileHandle.readPage(pids[i], nextPage);
+                int nextEntryCount = nextPage->header.entryCount;
+                delete(nextPage);
 
+                if (nextEntryCount != 0) {
+                    DFSPrintBTree(pids[i], ixfileHandle, attribute);
+                    if (i != pids.size() - 1) {
+                        cout << "]},"<< endl;
+                    }
+
+                }
+
+            }
+            cout << "]}"<< endl;
             // is leaf page
         }else {
             vector<int> keys;
@@ -860,13 +868,21 @@ void IndexManager::DFSPrintBTree(int pageNum, IXFileHandle &ixfileHandle, const 
             cout << "\"children\": [" << endl;
 
             for (int i = 0; i < pids.size(); i++) {
-                if (i != 0) {
-                    cout<<","<<endl;
-                }
-                DFSPrintBTree(pids[i], ixfileHandle, attribute);
-                cout<<"]}";
-            }
+                IXPage *nextPage = new IXPage;
+                ixfileHandle.readPage(pids[i], nextPage);
+                int nextEntryCount = nextPage->header.entryCount;
+                delete(nextPage);
 
+                if (nextEntryCount != 0) {
+                    DFSPrintBTree(pids[i], ixfileHandle, attribute);
+                    if (i != pids.size() - 1) {
+                        cout << "]},"<< endl;
+                    }
+
+                }
+
+            }
+            cout << "]}"<< endl;
             // is leaf page
         }else {
             vector<float> keys;
@@ -945,13 +961,19 @@ void IndexManager::DFSPrintBTree(int pageNum, IXFileHandle &ixfileHandle, const 
             cout<<"\"children\" :["<<endl;
 
             for (int i = 0; i < pids.size(); i++) {
-                if (i != 0) {
-                    cout<<","<<endl;
-                }
-                DFSPrintBTree(pids[i], ixfileHandle, attribute);
-                cout<<"]}";
-            }
+                IXPage *nextPage = new IXPage;
+                ixfileHandle.readPage(pids[i], nextPage);
+                int nextEntryCount = nextPage->header.entryCount;
+                delete(nextPage);
 
+                if (nextEntryCount != 0) {
+                    DFSPrintBTree(pids[i], ixfileHandle, attribute);
+                    if (i != pids.size() - 1) {
+                        cout << "]},"<< endl;
+                    }
+                }
+            }
+            cout << "]}"<< endl;
             // is leaf page
         }else {
             vector<string> keys;
