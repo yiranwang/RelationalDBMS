@@ -183,7 +183,7 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
             // insert the data entry
             void *restNodes = malloc((size_t)restSize);
             int offset = insertOffset + sizeof(IXPageHeader);
-            memcpy(restNodes, (char*)page + offset, (size_t)restSize);
+            memcpy((char*)restNodes, (char*)page + offset, (size_t)restSize);
 
             memcpy((char*)page + offset, key, (size_t)keyLength);
             offset += keyLength;
@@ -627,7 +627,7 @@ int IndexManager::findInsertOffset(IXPage *page, const void *key, int &countNode
 
     int offset = sizeof(IXPageHeader);
 
-    for (int i = 0; i < entryCount - 1; i++) {
+    for (int i = 0; i < entryCount; i++) {
         void *curKey = (char*)page + offset;
         int curKeyLength = key_length(page->header.attrType, curKey);
 
