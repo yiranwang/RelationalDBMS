@@ -37,7 +37,7 @@ int testCase_6(const string &indexFileName, const Attribute &attribute)
     rc = indexManager->openFile(indexFileName, ixfileHandle);
     assert(rc == success && "indexManager::openFile() should not fail.");
 
-    printf("IXPageHeader size is %u\n", sizeof(IXPageHeader));
+    printf("IXPageHeader size is %lu\n", sizeof(IXPageHeader));
 
     // insert entries
     for(unsigned i = 0; i <= numOfTuples; i++)

@@ -171,8 +171,8 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
     if (pageType == LEAF_PAGE_TYPE) {
 
         int keyLength = key_length(page->header.attrType, key);
-        int insertSize = keyLength + sizeof(RID);
-        bool needSplit = page->header.freeSpaceSize - insertSize < 0;
+        int dataEntryLength = keyLength + sizeof(RID);
+        bool needSplit = page->header.freeSpaceSize - dataEntryLength < 0;
 
         int countNode = 0;
         // find insert offset in page->data(!!!!! don't include IXPageHeader size!!!!!!!!!!)
@@ -181,8 +181,6 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
 
         // case 1.1: enough space in leaf page, so no need to split leaf page
         if (!needSplit) {
-            // used for adjusting lastEntryOffset
-            int prevLastEntryLength =  key_length(page->header.attrType, (char*)page + page->header.lastEntryOffset) + sizeof(RID);
 
             // insert the data entry
             void *restNodes = malloc((size_t)restSize);
@@ -201,13 +199,17 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
             // if inserted data entry is the last one, shift lastEntryOffset to the right by lastEntryLength
             // otherwise shift it to the right by inserted entry's length
 
-            int lastEntryOffsetAdjust = countNode == page->header.entryCount ? prevLastEntryLength : keyLength + sizeof(RID);
+            if (countNode == page->header.entryCount) {
+                page->header.lastEntryOffset = page->header.freeSpaceOffset;
+            } else {
+                page->header.lastEntryOffset += dataEntryLength;
+            }
 
-            page->header.lastEntryOffset += lastEntryOffsetAdjust;
+
 
             page->header.entryCount++;
-            page->header.freeSpaceSize -= (keyLength + sizeof(RID));
-            page->header.freeSpaceOffset += keyLength + sizeof(RID);
+            page->header.freeSpaceSize -= dataEntryLength;
+            page->header.freeSpaceOffset += dataEntryLength;
 
             newChildEntry = NULL;
 
@@ -216,6 +218,7 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
         }
         // case 1.2: not enough space in leaf page, need to split this leaf page
         else {
+            printf("Splitting a leaf...\n");
             // split leaf page
             // malloc new 2*pagesize space to copy original nodes + new node, no page header included
 
@@ -242,7 +245,6 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
 
             // now  doubleSpace: [entry0, entry1, ..., entryInsert, ..., entryM, ..., \0, \0, \0,]
 
-
             int allEntryCount = page->header.entryCount + 1;
             int halfEntryCount = allEntryCount / 2;
 
@@ -254,7 +256,6 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
                 int curKeyLength = key_length(page->header.attrType, (char*)doubleSpace + firstHalfOffset);
                 firstHalfOffset += curKeyLength + sizeof(RID);
             }
-
 
 
             // compose newChildEntry that will be returned
@@ -336,20 +337,11 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
         }
 
         // case 2.2: child is split, must insert newchildentry <key, PID>
-        int keyLength = key_length(page->header.attrType, newChildEntry);
-        int len = *(int*)((char*)newChildEntry);
-        char* child = (char*)malloc(len);
-        /*memcpy(child, (char*)newChildEntry + 4, len);
-        printf("newchildentry :%s", child);*/
+        int newChildEntryLength = key_length(page->header.attrType, newChildEntry) + sizeof(unsigned);
+        bool needSplit = page->header.freeSpaceSize - newChildEntryLength < 0;
 
-        int len2 = key_length(page->header.attrType, (char*)page->data);
-        int pid = *(int*)((char*)page->data + len2);
-
-        int insertSize = keyLength + sizeof(unsigned);
-        bool needSplit = page->header.freeSpaceSize - insertSize < 0;
 
         int countNode = 0;
-        // count the first half entry
 
         // !!!!!insertOffset don't include IXPageHeader size!!!!!!!!!!!!!!
         int insertOffset = findInsertOffset(page, newChildEntry, countNode);
@@ -358,9 +350,6 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
         // case 2.2.1: if no need to split this index page
         if (!needSplit) {
 
-            // used for adjusting lastEntryOffset
-            int prevLastEntryLength = key_length(page->header.attrType, (char*)page + page->header.lastEntryOffset) + sizeof(unsigned);
-
 
             // copy rest part out to restNodes
             int offset = sizeof(IXPageHeader) + insertOffset;
@@ -368,8 +357,6 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
             memcpy((char*)restNodes, (char*)page + offset, restSize);
 
             // insert newChildEntry to page
-
-            int newChildEntryLength = key_length(page->header.attrType, newChildEntry) + sizeof(unsigned);
             memcpy((char*)page + offset, (char*)newChildEntry, newChildEntryLength);
             offset += newChildEntryLength;
 
@@ -379,8 +366,11 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
             free(restNodes);
 
 
-            int lastEntryOffsetAdjust = countNode == page->header.entryCount ? prevLastEntryLength : newChildEntryLength;
-            page->header.lastEntryOffset += lastEntryOffsetAdjust;
+            if (countNode == page->header.entryCount) {
+                page->header.lastEntryOffset = page->header.freeSpaceOffset;
+            } else {
+                page->header.lastEntryOffset +=newChildEntryLength;
+            }
 
             // adjust freespace, entrycount, lastEntryOffset in page
             page->header.entryCount += 1;
@@ -597,11 +587,6 @@ IXPage* IndexManager::findNextPage(IXFileHandle &ixfileHandle, IXPage *page, con
 
 
         if (compareKey(key, curKey, page->header.attrType) >= 0 && compareKey(key, nextKey, page->header.attrType) < 0) {
-
-            int len2 = key_length(page->header.attrType, (char*)page->data);
-            int pid = *(int*)((char*)page->data + len2);
-            //printf("pid :%d", pid);
-
             nextPageNum = *(unsigned*)((char*)page + offset + curKeyLength);
             ixfileHandle.readPage(nextPageNum, nextPage);
             return nextPage;
