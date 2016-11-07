@@ -474,6 +474,8 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
             if (page->header.isRoot) {
                 IXPage *newRootPage = new IXPage;
 
+                printf("Splitting root page:%u...\n", page->header.pageNum);
+
                 // insert newChildEntry into new root page
                 unsigned newChildEntryLength = newChildEntryKeyLength + sizeof(unsigned);
                 memcpy(newRootPage->data, (char*)newChildEntry, newChildEntryLength);
@@ -503,7 +505,7 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
                 ixfileHandle.writePage(0, dirPage);
 
 
-                printf("************ Splitted a root!\n");
+                printf("************ Splitted a root: pageNum = %u!\n",page->header.pageNum );
 
                 delete(newRootPage);
                 delete(dirPage);
