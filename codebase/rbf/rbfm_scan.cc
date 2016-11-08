@@ -15,6 +15,9 @@ RC RecordBasedFileManager::scan(FileHandle &fileHandle,
       	RBFM_ScanIterator &rbfm_ScanIterator) 
 {
 
+	if (fileHandle.fd < 0) {
+        return -1;
+    }
 	rbfm_ScanIterator.opened = true;
 	rbfm_ScanIterator.fileHandle = fileHandle;
 

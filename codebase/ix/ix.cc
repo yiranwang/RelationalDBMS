@@ -102,6 +102,10 @@ RC IndexManager::scan(IXFileHandle &ixfileHandle,
         IX_ScanIterator &ix_ScanIterator) {
 
 
+    if (ixfileHandle.fileHandle.fd < 0) {
+        return -1;
+    }
+
     // initialize ixsi
     ix_ScanIterator.open = true;
     ix_ScanIterator.ixfh = ixfileHandle;

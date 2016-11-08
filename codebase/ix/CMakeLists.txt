@@ -20,8 +20,14 @@ target_link_libraries(ixtest_02 ix rbf rm)
 add_executable(ixtest_03 ixtest_03.cc)
 target_link_libraries(ixtest_03 ix rbf rm)
 
+add_executable(ixtest_05 ixtest_05.cc)
+target_link_libraries(ixtest_05 ix rbf rm)
+
 add_executable(ixtest_06 ixtest_06.cc)
 target_link_libraries(ixtest_06 ix rbf rm)
+
+add_executable(ixtest_07 ixtest_07.cc)
+target_link_libraries(ixtest_07 ix rbf rm)
 
 add_executable(ixtest_08 ixtest_08.cc)
 target_link_libraries(ixtest_08 ix rbf rm)
