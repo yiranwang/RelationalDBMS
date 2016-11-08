@@ -147,8 +147,14 @@ class IndexManager {
         void insertEntryToEmptyRoot(IXFileHandle &ixfileHandle, IXPage *rootPage, const void *key, const RID &rid);
         void insertTree(IXFileHandle &ixfileHandle, IXPage *page, const void *key, const RID &rid, void* &newChildEntry);
 
+        int deleteTree(IXFileHandle &ixfileHandle, IXPage *page, const void *key, const RID &rid, void* &oldChildEntry);
+
+
         int findInsertOffsetInNonLeafPage(IXPage *page, const void *key, int &countNode);
         int findInsertOffset(IXPage *page, const void *key, int &countNode);
+
+        int findDeleteOffset(IXPage *page, const void *key, const RID &rid, int &countNode);
+        int findEntryOffsetInIndexPage(IXPage *parentPage, const void *key);
 
         IXPage *findNextPage(IXFileHandle &ixfileHandle, IXPage *page, const void *key);
 

@@ -72,7 +72,24 @@ RC IndexManager::insertEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
 
 
 RC IndexManager::deleteEntry(IXFileHandle &ixfileHandle, const Attribute &attribute, const void *key, const RID &rid) {
-    return -1;
+
+    IXPage *dirPage = new IXPage;
+    ixfileHandle.readPage(0, dirPage);
+
+    int rootPageNumber = dirPage->header.leftmostPtr;
+
+    IXPage *rootPage = new IXPage;
+    ixfileHandle.readPage(rootPageNumber, rootPage);
+
+    delete(dirPage);
+
+    void *newChildEntry = NULL;
+
+    int rc = deleteTree(ixfileHandle, rootPage, key, rid, newChildEntry);
+
+    delete(rootPage);
+
+    return rc;
 }
 
 

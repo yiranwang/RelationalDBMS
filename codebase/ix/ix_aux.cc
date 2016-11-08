@@ -1,6 +1,7 @@
 
 #include <cstdlib>
 #include "ix.h"
+#include "../rbf/rbfm.h"
 #include<iostream>
 
 int IndexManager::key_length(const AttrType attrType, const void* key){
@@ -242,6 +243,7 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
 
             //copy rest part
             memcpy((char*)doubleSpace + offsetInDoubleSpace, (char*)page + offsetInOldPage, restSize);
+            offsetInDoubleSpace += restSize;
 
             // now  doubleSpace: [entry0, entry1, ..., entryInsert, ..., entryM, ..., \0, \0, \0,]
 
@@ -251,12 +253,38 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
             // calculate the offset of the first half, prevOffset is used to record the lastEntry offset
             int firstHalfOffset = 0;                // offset of the second half's starting address (inside page->data)
             int prevFirstHalfOffset = 0;            // offset of the last entry in the first half (inside page->data)
-            for (int i = 0; i < halfEntryCount; i++) {
+
+            // handel space nicely for varchar key
+            int firstHalfEntryCountForVarChar = 0;
+
+            /*for (int i = 0; i < halfEntryCount; i++) {
                 prevFirstHalfOffset = firstHalfOffset;
                 int curKeyLength = key_length(page->header.attrType, (char*)doubleSpace + firstHalfOffset);
                 firstHalfOffset += curKeyLength + sizeof(RID);
+            }*/
+
+            if (page->header.attrType == TypeVarChar) {
+                for (int i = 0; i < allEntryCount; i++) {
+                    int curKeyLength = key_length(page->header.attrType, (char*)doubleSpace + firstHalfOffset);
+                    if (firstHalfOffset + curKeyLength  + sizeof(RID) > offsetInDoubleSpace / 2) {
+                        break;
+                    }
+                    prevFirstHalfOffset = firstHalfOffset;
+                    firstHalfEntryCountForVarChar++;
+                    firstHalfOffset += curKeyLength + sizeof(RID);
+                }
+                //-----------------------------------------------------
+            }else {
+                for (int i = 0; i < halfEntryCount; i++) {
+                    prevFirstHalfOffset = firstHalfOffset;
+                    int curKeyLength = key_length(page->header.attrType, (char*)doubleSpace + firstHalfOffset);
+                    firstHalfOffset += curKeyLength + sizeof(RID);
+                }
             }
 
+            if (page->header.attrType == TypeVarChar) {
+                halfEntryCount = firstHalfEntryCountForVarChar;
+            }
 
             // compose newChildEntry that will be returned
             // (COPY UP) newChildEntry : key + PID
@@ -436,6 +464,9 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
                 }
             }
 
+            if (page->header.attrType == TypeVarChar) {
+                halfEntryCount = firstHalfEntryCountForVarChar;
+            }
 
             // locate the offsets of the end of other half and the last entry
             int totalOffset = firstHalfOffset;                  // end
@@ -457,9 +488,7 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
 
             //calculate offset of the end and the last entry of the other half except the returned entry
             // handel space nicely for varchar key
-            if (page->header.attrType == TypeVarChar) {
-                halfEntryCount = firstHalfEntryCountForVarChar;
-            }
+
 
             for (int i = 0; i < allEntryCount - halfEntryCount - 1; i++) {
                 prevTotalOffset = totalOffset;
@@ -770,6 +799,701 @@ IXPage * IndexManager::findLeafPage(IXFileHandle &ixfileHandle, IXPage *page, co
     return NULL;
 
 }
+
+
+int IndexManager::deleteTree(IXFileHandle &ixfileHandle, IXPage *page, const void *key, const RID &rid, void* &oldChildEntry) {
+
+    char pageType = page->header.pageType;
+
+    int originalFreeSpaceSize = PAGE_SIZE - sizeof(IXPageHeader);
+
+    //  if the page is leaf page
+    if (pageType == LEAF_PAGE_TYPE) {
+
+        IXPage *leftSiblingPage = new IXPage;
+        IXPage *rightSiblingPage = new IXPage;
+
+        // check and get left sibling page, if invalid, set it to null
+        if (page->header.prevPageNum != page->header.pageNum) {
+            ixfileHandle.readPage(page->header.prevPageNum, leftSiblingPage);
+            if (leftSiblingPage->header.parent != page->header.parent) {
+                delete(leftSiblingPage);
+            }
+        }else {
+            delete(leftSiblingPage);
+        }
+
+        // check and get right sibling page, if invalid, set it to null
+        if (page->header.nextPageNum != page->header.pageNum) {
+            ixfileHandle.readPage(page->header.nextPageNum, rightSiblingPage);
+            if (rightSiblingPage->header.parent != page->header.parent) {
+                delete(rightSiblingPage);
+            }
+        }else {
+            delete(rightSiblingPage);
+        }
+
+        int keyLength = key_length(page->header.attrType, key);
+        int keyEntryLength = keyLength + sizeof(RID);
+
+        int countNode = 0;
+        // occupancy greater than d, no merge and redistribution, or left and right siblings are none
+        if (page->header.freeSpaceSize + keyEntryLength > originalFreeSpaceSize / 2 ||
+                (leftSiblingPage == NULL && rightSiblingPage == NULL)) {
+
+            // !!!!!!! deleteOffset doesn't include size of IXPageHeader !!!!!!!!!!!!!!!!!!!!
+            int deleteOffset = findDeleteOffset(page, key, rid, countNode);
+
+            int restSize = page->header.freeSpaceOffset - sizeof(IXPageHeader) - deleteOffset - keyEntryLength;
+
+            if (deleteOffset == -1) {
+                return -1;    // invalid delete entry
+            }
+
+            int offset = sizeof(IXPageHeader);
+
+            /*
+            int deleteKeyLength = key_length(page->header.attrType, (char*)page + offset + deleteOffset);
+            RID deleteRid = *(RID*)((char*)page + offset + deleteOffset + deleteKeyLength);
+
+            if (deleteRid.pageNum != rid.pageNum || deleteRid.slotNum != rid.slotNum) {
+                return -1;     // invalid delete
+            }*/
+
+            // copy rest part to overwrite delete entry
+            memcpy((char*)page + sizeof(IXPageHeader) + deleteOffset,
+                   (char*)page + page->header.freeSpaceOffset - restSize, restSize);
+
+            // adjust entryCount, freespaceOffset, freespace size
+            page->header.entryCount--;
+            page->header.freeSpaceOffset -= keyEntryLength;
+            page->header.freeSpaceSize += keyEntryLength;
+
+            if (deleteOffset != page->header.lastEntryOffset) {
+                page->header.lastEntryOffset -= keyEntryLength;
+
+                // the deleted entry is the last entry, has to find the new last entry offset
+            }else {
+                offset = sizeof(IXPageHeader);
+                for (int i = 0; i < page->header.entryCount - 1; i++) {
+
+                    int curKeyLength = key_length(page->header.attrType, (char*)page + offset);
+                    offset += curKeyLength + sizeof(RID);
+                }
+                page->header.lastEntryOffset = offset;
+            }
+
+            ixfileHandle.writePage(page->header.pageNum, page);
+
+            if (oldChildEntry != NULL) {
+                free(oldChildEntry);
+            }
+            oldChildEntry = NULL;
+
+            return 0;
+
+            // occupancy less than d, have to merge or redistribution
+        }else {
+
+            IXPage *leftPage;
+            IXPage *rightPage;
+
+            int deleteOffset = findDeleteOffset(page, key, rid, countNode);
+            int restSize = page->header.freeSpaceOffset - sizeof(IXPageHeader) - deleteOffset - keyEntryLength;
+
+            // copy rest part to overwrite delete entry
+            memcpy((char*)page + sizeof(IXPageHeader) + deleteOffset,
+                   (char*)page + page->header.freeSpaceOffset - restSize, restSize);
+
+            // adjust entryCount, freespaceOffset, freespace size
+            page->header.entryCount--;
+            page->header.freeSpaceOffset -= keyEntryLength;
+            page->header.freeSpaceSize += keyEntryLength;
+
+            ixfileHandle.writePage(page->header.pageNum, page);
+
+            // leftSiblingPage has spare entries, set leftpage point to leftsibling page, rightPage point to page
+            if (leftSiblingPage != NULL && leftSiblingPage->header.freeSpaceSize > originalFreeSpaceSize / 2) {
+                leftPage = leftSiblingPage;
+                rightPage = page;
+
+            // rightSiblingPage has spare entries,
+            }else if (rightSiblingPage != NULL && rightSiblingPage->header.freeSpaceSize > originalFreeSpaceSize / 2) {
+                leftPage = page;
+                rightPage = rightSiblingPage;
+            }
+
+            // ---------redistribution leaf page--------------------
+            if (leftPage != NULL && rightPage != NULL) {
+
+                char* newSpace = (char*)malloc(PAGE_SIZE * 2);
+
+                int offsetInNewSpace = 0;
+
+                // copy entries in left page to newSpace
+                memcpy(newSpace + offsetInNewSpace, (char*)leftPage + sizeof(IXPageHeader),
+                       leftPage->header.freeSpaceOffset - sizeof(IXPageHeader));
+                offsetInNewSpace += leftPage->header.freeSpaceOffset - sizeof(IXPageHeader);
+
+
+                // copy entryies in right page to newSpace
+                memcpy(newSpace + offsetInNewSpace, (char*)rightPage + sizeof(IXPageHeader),
+                       rightPage->header.freeSpaceOffset - sizeof(IXPageHeader));
+                offsetInNewSpace += rightPage->header.freeSpaceOffset - sizeof(IXPageHeader);
+
+                int allEntryCount = leftPage->header.entryCount + rightPage->header.entryCount;
+                int halfEntryCount = allEntryCount / 2;
+
+                int firstHalfOffset = 0;
+                int prevFirstHalfOffset = 0;
+
+                // handel space nicely for varchar key
+                int firstHalfEntryCountForVarChar = 0;
+                if (page->header.attrType == TypeVarChar) {
+                    for (int i = 0; i < allEntryCount; i++) {
+                        int curKeyLength = key_length(page->header.attrType, newSpace + firstHalfOffset);
+                        if (firstHalfOffset + curKeyLength > offsetInNewSpace / 2) {
+                            break;
+                        }
+                        prevFirstHalfOffset = firstHalfOffset;
+                        firstHalfEntryCountForVarChar++;
+                        firstHalfOffset += curKeyLength + sizeof(RID);
+                    }
+                    //-----------------------------------------------------
+                }else {
+                    for (int i = 0; i < halfEntryCount; i++) {
+                        prevFirstHalfOffset = firstHalfOffset;
+                        int curKeyLength = key_length(page->header.attrType, newSpace + firstHalfOffset);
+                        firstHalfOffset += curKeyLength + sizeof(RID);
+                    }
+                }
+
+
+                // locate the offsets of the end of other half and the last entry
+                int totalOffset = firstHalfOffset;                  // end
+                int prevTotalOffset = firstHalfOffset;              // last entry
+
+                // find entryOffset in parent for node on rightPage---------------------------
+                int keyInParentLength = key_length(page->header.attrType, newSpace + firstHalfOffset);
+                void *keyInParent = malloc(keyInParentLength);
+                memcpy((char*)keyInParent, newSpace + firstHalfOffset, keyInParentLength);
+
+                int parentPageNum = rightPage->header.parent;
+                IXPage *parentPage = new IXPage;
+                ixfileHandle.readPage(parentPageNum, parentPage);
+
+                int entryOffsetInParent = findEntryOffsetInIndexPage(parentPage, key);
+
+                // replace key value in parent by new low key in rightpage
+                memcpy((char*)parentPage + entryOffsetInParent, (char*)keyInParent, keyInParentLength);
+                ixfileHandle.writePage(parentPageNum, parentPage);
+                delete(parentPage);
+                free(keyInParent);
+
+                // ------------------------------------------------
+                //calculate offset of the end and the last entry of the other half except the returned entry
+                // handel space nicely for varchar key
+                if (page->header.attrType == TypeVarChar) {
+                    halfEntryCount = firstHalfEntryCountForVarChar;
+                }
+
+                for (int i = 0; i < allEntryCount - halfEntryCount; i++) {
+                    prevTotalOffset = totalOffset;
+                    int curKeyLength = key_length(page->header.attrType, newSpace + totalOffset);
+                    totalOffset += curKeyLength;
+                    totalOffset += sizeof(RID);
+                }
+
+                // copy firsthalf from newspace to leftPage
+                memcpy((char*)leftPage + sizeof(IXPageHeader), newSpace, firstHalfOffset);
+
+                // copy secondhalf from newspace to rightPage
+                memcpy((char*)rightPage + sizeof(IXPageHeader), newSpace + firstHalfOffset, totalOffset - firstHalfOffset);
+
+                // adjust header in leftPage and rightPage
+                leftPage->header.entryCount = halfEntryCount;
+                leftPage->header.freeSpaceOffset = sizeof(IXPageHeader) + firstHalfOffset;
+                leftPage->header.freeSpaceSize = PAGE_SIZE - sizeof(IXPageHeader) - firstHalfOffset;
+                leftPage->header.lastEntryOffset = sizeof(IXPageHeader) + prevFirstHalfOffset;
+
+                rightPage->header.entryCount = allEntryCount - halfEntryCount;
+                rightPage->header.freeSpaceOffset = sizeof(IXPageHeader) + totalOffset - firstHalfOffset;
+                rightPage->header.freeSpaceSize = PAGE_SIZE - rightPage->header.freeSpaceOffset;
+                rightPage->header.lastEntryOffset = sizeof(IXPageHeader) + prevTotalOffset - firstHalfOffset;
+
+                ixfileHandle.writePage(leftPage->header.pageNum, leftPage);
+                ixfileHandle.writePage(rightPage->header.pageNum, rightPage);
+
+                free(oldChildEntry);
+                oldChildEntry = NULL;
+                free(newSpace);
+
+
+            // --------------- merge in leaf page----------------------------------------
+            }else {
+                if (rightSiblingPage != NULL) {
+                    leftPage = page;
+                    rightPage = rightSiblingPage;
+                }else if (leftSiblingPage != NULL) {
+                    leftPage = leftSiblingPage;
+                    rightPage = page;
+                }
+
+                // oldchildentry = & (current entry in parent for right);
+                int keyInParentLength = key_length(page->header.attrType, rightPage->data);
+                void *keyInParent = malloc(keyInParentLength);
+                memcpy((char*)keyInParent, rightPage->data, keyInParentLength);
+
+                int parentPageNum = rightPage->header.parent;
+                IXPage *parentPage = new IXPage;
+                ixfileHandle.readPage(parentPageNum, parentPage);
+
+                int keyOffsetInParent = findEntryOffsetInIndexPage(parentPage, keyInParent);
+
+                int entryInParentLength = keyInParentLength + sizeof(unsigned);
+                void* entryInParent = malloc(keyInParentLength + sizeof(unsigned));
+                memcpy((char*)entryInParent, (char*)parentPage + keyOffsetInParent, entryInParentLength);
+
+                oldChildEntry = entryInParent;
+
+                free(keyInParent);
+                delete(parentPage);
+                //free(entryInParent);
+
+                // move entries from right to left, discard right page ????????
+                memcpy((char*)leftPage + leftPage->header.freeSpaceOffset, (char*)rightPage->data,
+                       rightPage->header.freeSpaceOffset - sizeof(IXPageHeader));
+
+                //adjust sibling pointers
+                if (rightPage->header.nextPageNum == rightPage->header.pageNum) {
+
+                    leftPage->header.nextPageNum = leftPage->header.pageNum;
+                }else {
+                    leftPage->header.nextPageNum = rightPage->header.nextPageNum;
+                }
+
+                // adjust leftPage header offspace, entryCount, lastEntryOffset
+                leftPage->header.entryCount += rightPage->header.entryCount;
+                leftPage->header.freeSpaceOffset += rightPage->header.freeSpaceOffset - sizeof(IXPageHeader);
+                leftPage->header.freeSpaceSize = PAGE_SIZE - leftPage->header.freeSpaceOffset;
+                leftPage->header.lastEntryOffset = leftPage->header.freeSpaceOffset -
+                                                   (rightPage->header.freeSpaceOffset - rightPage->header.lastEntryOffset);
+
+                ixfileHandle.writePage(leftPage->header.pageNum, leftPage);
+                ixfileHandle.writePage(rightPage->header.pageNum, rightPage);
+
+            }
+        }
+        if (leftSiblingPage != NULL) {
+            delete (leftSiblingPage);
+        }
+        if (rightSiblingPage != NULL) {
+            delete (rightSiblingPage);
+        }
+
+    // --------------------------------------------------------------------------
+    // page is non-leaf page
+    }else {
+        IXPage *nextPage = findNextPage(ixfileHandle, page, key);
+
+        if (deleteTree(ixfileHandle, nextPage, key, rid, oldChildEntry) == -1) {
+            return -1;
+        } //recursively delete entry in the leaf page
+
+        // case 2.1: usual case, child is not merge or redistribution, done
+        if (oldChildEntry == NULL) {
+            delete(nextPage);
+            return 0;
+        }
+
+        // case 2.2: child page has been discard
+        int deleteOffsetInIndexPage = findEntryOffsetInIndexPage(page, oldChildEntry);
+        int oldChildKeyLength = key_length(page->header.attrType, (char*)page->data + deleteOffsetInIndexPage);
+        int oldChildEntryLength = oldChildKeyLength + sizeof(unsigned);
+
+        // delete oldChildEntry
+        int restSize = page->header.freeSpaceOffset - sizeof(IXPageHeader) - deleteOffsetInIndexPage - oldChildEntryLength;
+        memcpy((char*)page->data + deleteOffsetInIndexPage,
+               (char*)page->data + deleteOffsetInIndexPage + oldChildEntryLength, restSize);
+
+        // adjust entryCount, freespaceOffset, freespace size
+        page->header.entryCount--;
+        page->header.freeSpaceOffset -= oldChildEntryLength;
+        page->header.freeSpaceSize += oldChildEntryLength;
+
+        // case 2.2.1 : have spared entries, no merge or redistribution------------------------
+        if (page->header.freeSpaceSize > originalFreeSpaceSize / 2) {
+
+            //adjust lastEntryOffset
+            if (deleteOffsetInIndexPage != page->header.lastEntryOffset) {
+                page->header.lastEntryOffset -= oldChildEntryLength;
+
+                // the deleted entry is the last entry, has to find the new last entry offset
+            }else {
+                int offset = sizeof(IXPageHeader);
+                for (int i = 0; i < page->header.entryCount - 1; i++) {
+
+                    int curKeyLength = key_length(page->header.attrType, (char*)page + offset);
+                    offset += curKeyLength + sizeof(unsigned);
+                }
+                page->header.lastEntryOffset = offset;
+            }
+            ixfileHandle.writePage(page->header.pageNum, page);
+
+            // set oldChildEntry to null, stop delete;
+            free(oldChildEntry);
+            oldChildEntry = NULL;
+            delete(nextPage);
+            return 0;
+
+
+            // case 2.2.2 : have no spared entries, merge or redistribution, oldChildEntry has been deleted------------------------
+        }else {
+
+            IXPage *leftSiblingPage = new IXPage;
+            IXPage *rightSiblingPage = new IXPage;
+
+            IXPage *leftPage;
+            IXPage *rightPage;
+
+            int parentPageNum = page->header.parent;
+            IXPage *parentPage = new IXPage;
+            ixfileHandle.readPage(parentPageNum, parentPage);
+
+            // find sibling by parent
+            int keyInParentLength = key_length(page->header.attrType, page->data);
+            void *keyInParent = malloc(keyInParentLength);
+            memcpy(keyInParent, parentPage->data, keyInParentLength);
+            int keyOffsetInParent = findEntryOffsetInIndexPage(parentPage, keyInParent);
+
+            //compose entry in parent(used for redistribution)
+            void *entryInParent = malloc(keyInParentLength + sizeof(unsigned));
+            int entryInParentLength = keyInParentLength + sizeof(unsigned);
+
+            memcpy((char*)entryInParent, (char*)parentPage, entryInParentLength);
+
+
+            int leftSiblingPageNum = 0;
+            int rightSiblingPageNum = 0;
+
+            if (parentPage->header.leftmostPtr == page->header.pageNum) {  // key is the first key in parent
+                leftSiblingPageNum = 0;
+                if (parentPage->header.entryCount >= 1) {
+                    rightSiblingPageNum = *(unsigned*)((char*)parentPage->data + keyInParentLength);
+                }
+
+            }else if (keyOffsetInParent == parentPage->header.lastEntryOffset) { // key is the last key in parent
+                if (parentPage->header.entryCount == 1) {
+                    leftSiblingPageNum = parentPage->header.leftmostPtr;
+                }else {
+                    leftSiblingPageNum = *(unsigned *) ((char *) parentPage->data + keyOffsetInParent -
+                                                        sizeof(unsigned));
+                }
+                rightSiblingPageNum = 0;
+            }else {
+                leftSiblingPageNum = *(unsigned*)((char*)parentPage->data + keyOffsetInParent - sizeof(unsigned));
+
+                rightSiblingPageNum = *(unsigned*)((char*)parentPage->data + keyOffsetInParent + keyInParentLength);
+            }
+
+
+
+            if (leftSiblingPageNum != 0) {
+                ixfileHandle.readPage(leftSiblingPageNum, leftSiblingPage);
+            }else {
+                delete(leftSiblingPage);
+            }
+            if (rightSiblingPageNum != 0) {
+                ixfileHandle.readPage(rightSiblingPageNum, rightSiblingPage);
+            }else {
+                delete(rightSiblingPage);
+            }
+
+            // leftSiblingPage has spare entries, set leftpage point to leftsibling page, rightPage point to page
+            if (leftSiblingPage != NULL && leftSiblingPage->header.freeSpaceSize > originalFreeSpaceSize / 2) {
+                leftPage = leftSiblingPage;
+                rightPage = page;
+
+                // rightSiblingPage has spare entries,
+            }else if (rightSiblingPage != NULL && rightSiblingPage->header.freeSpaceSize > originalFreeSpaceSize / 2) {
+                leftPage = page;
+                rightPage = rightSiblingPage;
+            }
+
+            // ------------redistribution of index page------------------------
+            if (leftPage != NULL && rightPage != NULL) {
+
+                // redistribute evenly between left and right page through parent;
+                // copy all entries in left + entryInParent + entries in right page
+                char *newSpace = (char*)malloc(PAGE_SIZE * 2);
+                int offsetInNewSpace = 0;
+
+                memcpy(newSpace, leftPage->data, leftPage->header.freeSpaceOffset - sizeof(IXPageHeader));
+                offsetInNewSpace += leftPage->header.freeSpaceOffset - sizeof(IXPageHeader);
+
+                memcpy(newSpace + offsetInNewSpace, entryInParent, keyInParentLength + sizeof(unsigned));
+                offsetInNewSpace += keyInParentLength + sizeof(unsigned);
+
+                memcpy(newSpace + offsetInNewSpace, rightPage->data, rightPage->header.freeSpaceOffset - sizeof(IXPageHeader));
+                offsetInNewSpace += rightPage->header.freeSpaceOffset - sizeof(IXPageHeader);
+
+                int allEntryCount = leftPage->header.entryCount + rightPage->header.entryCount - 1;
+                int halfEntryCount = allEntryCount / 2;
+
+                int firstHalfOffset = 0;
+                int prevFirstHalfOffset = 0;
+
+                // handel space nicely for varchar key
+                int firstHalfEntryCountForVarChar = 0;
+                if (page->header.attrType == TypeVarChar) {
+                    for (int i = 0; i < allEntryCount; i++) {
+                        int curKeyLength = key_length(page->header.attrType, newSpace + firstHalfOffset);
+                        if (firstHalfOffset + curKeyLength > offsetInNewSpace / 2) {
+                            break;
+                        }
+                        prevFirstHalfOffset = firstHalfOffset;
+                        firstHalfEntryCountForVarChar++;
+                        firstHalfOffset += curKeyLength + sizeof(unsigned);
+                    }
+                    //-----------------------------------------------------
+                }else {
+                    for (int i = 0; i < halfEntryCount; i++) {
+                        prevFirstHalfOffset = firstHalfOffset;
+                        int curKeyLength = key_length(page->header.attrType, newSpace + firstHalfOffset);
+                        firstHalfOffset += curKeyLength + sizeof(unsigned);
+                    }
+                }
+
+
+                // modify the entry in parent
+                memcpy((char*)parentPage->data + keyOffsetInParent, newSpace + firstHalfOffset, entryInParentLength);
+                ixfileHandle.writePage(parentPageNum, parentPage);
+
+                int secondHalfBeginOffset = firstHalfOffset + entryInParentLength;
+
+                // locate the offsets of the end of other half and the last entry
+                int totalOffset = secondHalfBeginOffset;                  // end
+                int prevTotalOffset = secondHalfBeginOffset;              // last entry
+
+
+                // ------------------------------------------------
+                //calculate offset of the end and the last entry of the other half except the returned entry
+                // handel space nicely for varchar key
+                if (page->header.attrType == TypeVarChar) {
+                    halfEntryCount = firstHalfEntryCountForVarChar;
+                }
+
+                for (int i = 0; i < allEntryCount - halfEntryCount; i++) {
+                    prevTotalOffset = totalOffset;
+                    int curKeyLength = key_length(page->header.attrType, newSpace + totalOffset);
+                    totalOffset += curKeyLength;
+                    totalOffset += sizeof(unsigned);
+                }
+
+                // copy firsthalf from newspace to leftPage
+                memcpy((char*)leftPage + sizeof(IXPageHeader), newSpace, firstHalfOffset);
+
+                // copy secondhalf from newspace to rightPage
+                memcpy((char*)rightPage + sizeof(IXPageHeader), newSpace + secondHalfBeginOffset,
+                       totalOffset - secondHalfBeginOffset);
+
+                // adjust header in leftPage and rightPage
+                leftPage->header.entryCount = halfEntryCount;
+                leftPage->header.freeSpaceOffset = sizeof(IXPageHeader) + firstHalfOffset;
+                leftPage->header.freeSpaceSize = PAGE_SIZE - sizeof(IXPageHeader) - firstHalfOffset;
+                leftPage->header.lastEntryOffset = sizeof(IXPageHeader) + prevFirstHalfOffset;
+
+                rightPage->header.entryCount = allEntryCount - halfEntryCount;
+                rightPage->header.freeSpaceOffset = sizeof(IXPageHeader) + totalOffset - secondHalfBeginOffset;
+                rightPage->header.freeSpaceSize = PAGE_SIZE - rightPage->header.freeSpaceOffset;
+                rightPage->header.lastEntryOffset = sizeof(IXPageHeader) + prevTotalOffset - secondHalfBeginOffset;
+
+                ixfileHandle.writePage(leftPage->header.pageNum, leftPage);
+                ixfileHandle.writePage(rightPage->header.pageNum, rightPage);
+
+                free(oldChildEntry);
+                oldChildEntry = NULL;
+                free(newSpace);
+
+                free(keyInParent);
+                free(entryInParent);
+
+            //  ---------------------merge index page, oldChildEntry has been deleted -------------------------------------
+            }else {
+                if (rightSiblingPage != NULL) {
+                    leftPage = page;
+                    rightPage = rightSiblingPage;
+                }else if (leftSiblingPage != NULL) {
+                    leftPage = leftSiblingPage;
+                    rightPage = page;
+                }
+
+                // find entry in parent of leftpage
+                int leftPageKeyInParentLength = key_length(page->header.attrType, leftPage->data);
+                void *leftPageKeyInParent = malloc(leftPageKeyInParentLength);
+                memcpy((char*)leftPageKeyInParent, (char*)leftPage->data, leftPageKeyInParentLength);
+
+                int leftPageKeyInParentOffset = findEntryOffsetInIndexPage(parentPage, leftPageKeyInParent);
+
+                // oldchildentry = & (current entry in parent for M);
+                leftPageKeyInParentLength = key_length(page->header.attrType, (char*)parentPage + leftPageKeyInParentOffset);
+
+                int leftPageEntryInParentLength = leftPageKeyInParentLength + sizeof(unsigned);
+                void *leftPageEntryInParent = malloc(leftPageEntryInParentLength);
+
+                memcpy((char*)leftPageEntryInParent, (char*)parentPage + leftPageKeyInParentOffset +
+                        sizeof(IXPageHeader), leftPageKeyInParentLength);
+
+                *(unsigned*)((char*)leftPageEntryInParent + leftPageEntryInParentLength) = *(unsigned*)(
+                        (char*)parentPage + leftPageKeyInParentOffset + sizeof(IXPageHeader) + leftPageKeyInParentLength);
+
+                oldChildEntry = leftPageEntryInParent;
+
+                // copy entries in leftPageEntryInParent + rightpage to leftpage, and discard right page?????
+                memcpy((char*)leftPage + leftPage->header.freeSpaceOffset, (char*)leftPageEntryInParent,
+                       leftPageEntryInParentLength);
+
+                memcpy((char*)leftPage + leftPage->header.freeSpaceOffset + leftPageEntryInParentLength,
+                       (char*)rightPage->data, rightPage->header.freeSpaceOffset - sizeof(IXPageHeader));
+
+                // adjust leftPage header offspace, entryCount, lastEntryOffset
+                leftPage->header.entryCount += rightPage->header.entryCount + 1;
+                leftPage->header.freeSpaceOffset += rightPage->header.freeSpaceOffset - sizeof(IXPageHeader) +
+                        leftPageEntryInParentLength;
+                leftPage->header.freeSpaceSize = PAGE_SIZE - leftPage->header.freeSpaceOffset;
+                leftPage->header.lastEntryOffset = leftPage->header.freeSpaceOffset -
+                        (rightPage->header.freeSpaceOffset - rightPage->header.lastEntryOffset);
+
+                free(leftPageKeyInParent);
+            }
+
+
+            ixfileHandle.writePage(leftPage->header.pageNum, leftPage);
+            ixfileHandle.writePage(rightPage->header.pageNum, rightPage);
+
+            free(keyInParent);
+            free(entryInParent);
+            if (leftSiblingPage != NULL) {
+                delete (leftSiblingPage);
+            }
+            if (rightSiblingPage != NULL) {
+                delete (rightSiblingPage);
+            }
+            delete(parentPage);
+            free(keyInParent);
+            free(entryInParent);
+        }
+
+
+        delete nextPage;
+    }
+
+    return 0;
+}
+
+
+int IndexManager::findDeleteOffset(IXPage *page, const void *key, const RID &rid, int &countNode) {
+    if (page->header.entryCount == 0) {
+        return -1;
+    }
+
+    int ridOrPidSize = 0;
+
+    if (page->header.pageType == LEAF_PAGE_TYPE) {
+        ridOrPidSize = sizeof(RID);
+    }else {
+        ridOrPidSize = sizeof(unsigned);
+    }
+
+    int entryCount = page->header.entryCount;
+
+    void *lastKey = (char*)page + page->header.lastEntryOffset;
+
+    //key > lastKey, invalid delete
+    if (compareKey(key, lastKey, page->header.attrType) > 0) {
+        countNode = 0;
+        return -1;
+
+    }else if (compareKey(key, lastKey, page->header.attrType) == 0) {
+        int lastKeyLength = key_length(page->header.attrType, lastKey);
+        if (page->header.pageType == LEAF_PAGE_TYPE) {
+            RID lastKeyRid = *(RID*)((char*)page + page->header.lastEntryOffset + lastKeyLength);
+
+            if (lastKeyRid.pageNum == rid.pageNum && lastKeyRid.slotNum == rid.slotNum) {
+                return page->header.lastEntryOffset - sizeof(IXPageHeader);
+
+            }else {
+                return -1;
+            }
+        }else {
+
+            return page->header.lastEntryOffset - sizeof(IXPageHeader);
+        }
+
+    }
+
+    int offset = sizeof(IXPageHeader);
+
+    for (int i = 0; i < entryCount; i++) {
+        void *curKey = (char*)page + offset;
+        int curKeyLength = key_length(page->header.attrType, curKey);
+
+        if (compareKey(curKey, key, page->header.attrType) == 0 ) {
+
+            if (page->header.pageType == LEAF_PAGE_TYPE) {
+                RID curKeyRid = *(RID*)((char*)page + offset + curKeyLength);
+
+                if (curKeyRid.pageNum == rid.pageNum && curKeyRid.slotNum == rid.slotNum) {
+                    return offset - sizeof(IXPageHeader);
+
+                }else {
+                    return -1;
+                }
+
+            }else {
+
+                return offset - sizeof(IXPageHeader);
+            }
+        }
+        countNode++;
+        offset += curKeyLength + ridOrPidSize;
+    }
+
+    return -1;
+}
+
+// find entry offset in parent for sibling page
+//  !!!!!!!!!!!!don't include the size of IXPageHeader !!!!!!!!!!!!!!!
+int IndexManager::findEntryOffsetInIndexPage(IXPage *page, const void *key) {
+
+    int entryCount = page->header.entryCount;
+    int offset = sizeof(IXPageHeader);
+
+    void *firstKey = (char*)page + offset;
+    if (compareKey(key, firstKey, page->header.attrType) < 0) {
+        return 0;
+    }
+
+    void *lastKey = (char*)page + page->header.lastEntryOffset;
+    if (compareKey(lastKey, key, page->header.attrType) <= 0) {
+        return page->header.lastEntryOffset - sizeof(IXPageHeader);
+    }
+
+    for (int i = 0; i < entryCount - 1; i++) {
+
+        int curKeyLength = key_length(page->header.attrType, (char*)page + offset);
+
+        void *nextKey = (char*)page + offset + curKeyLength + sizeof(unsigned);
+
+        if (compareKey(key, nextKey, page->header.attrType) < 0) {
+            return offset - sizeof(IXPageHeader);
+        }
+        offset += curKeyLength + sizeof(unsigned);
+    }
+
+    return -1;
+}
+
 
 void IndexManager::DFSPrintBTree(int pageNum, IXFileHandle &ixfileHandle, const Attribute &attribute) const{
     IXPage *page = new IXPage;
