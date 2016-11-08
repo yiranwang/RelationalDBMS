@@ -408,15 +408,32 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
 
             //copy the other half
             memcpy((char*)doubleSpace + offsetInDoubleSpace, (char*)page + offsetInOldPage, restSize);
+            offsetInDoubleSpace += restSize;
+
+            int firstHalfOffset = 0;
+            int prevFirstHalfOffset = 0;
 
 
             // locate the first half; calculate the offset of the first half, prevOffset is used to record the lastEntry offset
-            int firstHalfOffset = 0;
-            int prevFirstHalfOffset = 0;
-            for (int i = 0; i < halfEntryCount; i++) {
-                prevFirstHalfOffset = firstHalfOffset;
-                int curKeyLength = key_length(page->header.attrType, (char*)doubleSpace + firstHalfOffset);
-                firstHalfOffset += curKeyLength + sizeof(int);
+            // handel space nicely for varchar key
+            int firstHalfEntryCountForVarChar = 0;
+            if (page->header.attrType == TypeVarChar) {
+                for (int i = 0; i < allEntryCount; i++) {
+                    int curKeyLength = key_length(page->header.attrType, (char*)doubleSpace + firstHalfOffset);
+                    if (firstHalfOffset + curKeyLength > offsetInDoubleSpace / 2) {
+                        break;
+                    }
+                    prevFirstHalfOffset = firstHalfOffset;
+                    firstHalfEntryCountForVarChar++;
+                    firstHalfOffset += curKeyLength + sizeof(int);
+                }
+            //-----------------------------------------------------
+            }else {
+                for (int i = 0; i < halfEntryCount; i++) {
+                    prevFirstHalfOffset = firstHalfOffset;
+                    int curKeyLength = key_length(page->header.attrType, (char*)doubleSpace + firstHalfOffset);
+                    firstHalfOffset += curKeyLength + sizeof(int);
+                }
             }
 
 
@@ -436,11 +453,29 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
             totalOffset += returnedKeyLength + sizeof(unsigned);
             int secondHalfBeginOffset = totalOffset;
 
+
+
             //calculate offset of the end and the last entry of the other half except the returned entry
+            // handel space nicely for varchar key
+            if (page->header.attrType == TypeVarChar) {
+                halfEntryCount = firstHalfEntryCountForVarChar;
+            }
+
             for (int i = 0; i < allEntryCount - halfEntryCount - 1; i++) {
                 prevTotalOffset = totalOffset;
                 int curKeyLength = key_length(page->header.attrType, (char*)doubleSpace + totalOffset);
-                totalOffset += curKeyLength + sizeof(unsigned);
+                totalOffset += curKeyLength;
+
+                // adjust the parents of children pages of new splitted index page to newPage
+                int curEntryPid = *(int*)((char*)doubleSpace + totalOffset);
+                IXPage *curEntryPidPage = new IXPage;
+                ixfileHandle.readPage(curEntryPid, curEntryPidPage);
+                curEntryPidPage->header.parent = ixfileHandle.fileHandle.getNumberOfPages();
+                ixfileHandle.writePage(curEntryPid, curEntryPidPage);
+                delete curEntryPidPage;
+                //----------------------------------------------------------------------------
+
+                totalOffset += sizeof(unsigned);
             }
 
             // copy the firstHalf from doublespace to page
@@ -509,6 +544,7 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
 
                 page->header.isRoot = false;
                 page->header.parent = newRootPage->header.pageNum;
+                newPage->header.parent = newRootPage->header.pageNum;
 
                 // adjust rootPage number in dirPage
                 IXPage *dirPage = new IXPage;
@@ -526,7 +562,7 @@ void IndexManager::insertTree(IXFileHandle &ixfileHandle, IXPage *page, const vo
             }
 
             ixfileHandle.writePage(page->header.pageNum, page);
-            //ixfileHandle.writePage(newPage->header.pageNum, newPage);
+            ixfileHandle.writePage(newPage->header.pageNum, newPage);
 
 
             //free(newChildEntry);
@@ -933,6 +969,7 @@ void IndexManager::DFSPrintBTree(int pageNum, IXFileHandle &ixfileHandle, const 
                 offset += sizeof(int);
 
                 memcpy(key, (char*)page + offset, keyLength);
+                key[keyLength] = '\0';
                 string s(key);
                 keys.push_back(s);
                 offset += keyLength;
@@ -977,6 +1014,7 @@ void IndexManager::DFSPrintBTree(int pageNum, IXFileHandle &ixfileHandle, const 
                 offset += sizeof(int);
 
                 memcpy(key, (char *) page + offset, keyLength);
+                key[keyLength] = '\0';
                 string s(key);
                 keys.push_back(s);
                 offset += keyLength;
