@@ -40,3 +40,6 @@ target_link_libraries(ixtest_12 ix rbf rm)
 
 add_executable(ixtest_13 ixtest_13.cc)
 target_link_libraries(ixtest_13 ix rbf rm)
+
+add_executable(ixtest_14 ixtest_14.cc)
+target_link_libraries(ixtest_14 ix rbf rm)

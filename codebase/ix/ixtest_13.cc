@@ -143,6 +143,12 @@ int testCase_13(const string &indexFileName, const Attribute &attribute)
     rc = ix_ScanIterator.close();
     assert(rc == success && "IX_ScanIterator::close() should not fail.");
 
+
+
+    indexManager->printBtree(ixfileHandle, attribute);
+
+
+
     // Close Index
     rc = indexManager->closeFile(ixfileHandle);
     assert(rc == success && "indexManager::closeFile() should not fail.");
