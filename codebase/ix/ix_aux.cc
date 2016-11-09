@@ -21,6 +21,8 @@ int IndexManager::compareKey(const void *key1, const void *key2, const AttrType 
         return *(int*)key1 - *(int*)key2;
     }
     else if (attrType == TypeReal) {
+        float k1 = *(float*)key1;
+        float k2 = *(float*)key2;
         if (memcmp(key1, key2, sizeof(float)) == 0) {
             return 0;
         }
@@ -798,7 +800,8 @@ int IndexManager::deleteTree(IXFileHandle &ixfileHandle, IXPage *page, const voi
     int freeSpaceCapacity = PAGE_SIZE - sizeof(IXPageHeader);
 
 
-    //  case 1: if the page is leaf page
+    //  case 1: if the page is leaf page-----------------------------------------------------
+
     if (pageType == LEAF_PAGE_TYPE) {
 
         // locate the entry to be deleted
@@ -820,7 +823,7 @@ int IndexManager::deleteTree(IXFileHandle &ixfileHandle, IXPage *page, const voi
         // try to read out left sibling page, otherwise set it to null
         if (page->header.prevPageNum != page->header.pageNum) {
             ixfileHandle.readPage(page->header.prevPageNum, leftSiblingPage);
-            if (leftSiblingPage->header.parent != page->header.parent) {
+            if (leftSiblingPage->header.parent != page->header.parent || leftSiblingPage->header.pageNum == 2) {
                 delete(leftSiblingPage);
                 leftSiblingPage = NULL;
             }
@@ -855,7 +858,7 @@ int IndexManager::deleteTree(IXFileHandle &ixfileHandle, IXPage *page, const voi
             int restSize = page->header.freeSpaceOffset - sizeof(IXPageHeader) - deleteOffset - entryLength;
 
             // case 1.2.1.1: entry to be deleted is the last entry
-            if (deleteOffset != page->header.lastEntryOffset) {
+            if (deleteOffset == page->header.lastEntryOffset) {
 
                 // find the second last entry offset
                 short offset = 0;
@@ -876,6 +879,17 @@ int IndexManager::deleteTree(IXFileHandle &ixfileHandle, IXPage *page, const voi
             page->header.entryCount--;
             page->header.freeSpaceOffset -= entryLength;
             page->header.freeSpaceSize += entryLength;
+
+            if (page->header.entryCount == 0) {
+                int parentPageNum = page->header.parent;
+                IXPage *parentPage = new IXPage;
+                ixfileHandle.readPage(parentPageNum, parentPage);
+                parentPage->header.entryCount--;
+                parentPage->header.freeSpaceOffset = sizeof(IXPageHeader);
+                parentPage->header.freeSpaceSize = PAGE_SIZE - sizeof(IXPageHeader);
+                ixfileHandle.writePage(parentPageNum, parentPage);
+                delete (parentPage);
+            }
 
             ixfileHandle.writePage(page->header.pageNum, page);
 
@@ -905,12 +919,12 @@ int IndexManager::deleteTree(IXFileHandle &ixfileHandle, IXPage *page, const voi
             ixfileHandle.writePage(page->header.pageNum, page);
 
             // leftSiblingPage has spare entries, set leftpage point to leftsibling page, rightPage point to page
-            if (leftSiblingPage != NULL && leftSiblingPage->header.freeSpaceSize > freeSpaceCapacity / 2) {
+            if (leftSiblingPage != NULL && leftSiblingPage->header.freeSpaceSize + entryLength < freeSpaceCapacity / 2) {
                 leftPage = leftSiblingPage;
                 rightPage = page;
             }
             // rightSiblingPage has spare entries,
-            else if (rightSiblingPage != NULL && rightSiblingPage->header.freeSpaceSize > freeSpaceCapacity / 2) {
+            else if (rightSiblingPage != NULL && rightSiblingPage->header.freeSpaceSize + entryLength < freeSpaceCapacity / 2) {
                 leftPage = page;
                 rightPage = rightSiblingPage;
             }
@@ -1401,23 +1415,30 @@ int IndexManager::deleteTree(IXFileHandle &ixfileHandle, IXPage *page, const voi
     return 0;
 }
 
-
+// find delete offset in leaf page
 int IndexManager::findDeleteOffset(IXPage *page, const void *key, const RID &rid, int &countNode) {
     if (page->header.entryCount == 0) {
         return -1;
     }
 
-    int ridOrPidSize = 0;
-
-    if (page->header.pageType == LEAF_PAGE_TYPE) {
-        ridOrPidSize = sizeof(RID);
-    }else {
-        ridOrPidSize = sizeof(unsigned);
-    }
-
     int entryCount = page->header.entryCount;
-
+    void *firstKey = (char*)page->data;
     void *lastKey = (char*)page + page->header.lastEntryOffset;
+
+    //key < firstKey, invalid delete
+    if (compareKey(key, firstKey, page->header.attrType) < 0) {
+        countNode = 0;
+        return -1;
+
+    }else if (compareKey(key, firstKey, page->header.attrType) == 0) {
+        int firstKeyLength = key_length(page->header.attrType, firstKey);
+
+        RID firstKeyRid = *(RID*)((char*)firstKey + firstKeyLength);
+
+        if (firstKeyRid.pageNum == rid.pageNum && firstKeyRid.slotNum == rid.slotNum) {
+            return 0;
+        }
+    }
 
     //key > lastKey, invalid delete
     if (compareKey(key, lastKey, page->header.attrType) > 0) {
@@ -1426,20 +1447,13 @@ int IndexManager::findDeleteOffset(IXPage *page, const void *key, const RID &rid
 
     }else if (compareKey(key, lastKey, page->header.attrType) == 0) {
         int lastKeyLength = key_length(page->header.attrType, lastKey);
-        if (page->header.pageType == LEAF_PAGE_TYPE) {
-            RID lastKeyRid = *(RID*)((char*)page + page->header.lastEntryOffset + lastKeyLength);
 
-            if (lastKeyRid.pageNum == rid.pageNum && lastKeyRid.slotNum == rid.slotNum) {
-                return page->header.lastEntryOffset - sizeof(IXPageHeader);
+        RID lastKeyRid = *(RID*)((char*)lastKey + lastKeyLength);
 
-            }else {
-                return -1;
-            }
-        }else {
-
+        if (lastKeyRid.pageNum == rid.pageNum && lastKeyRid.slotNum == rid.slotNum) {
             return page->header.lastEntryOffset - sizeof(IXPageHeader);
-        }
 
+        }
     }
 
     int offset = sizeof(IXPageHeader);
@@ -1448,25 +1462,21 @@ int IndexManager::findDeleteOffset(IXPage *page, const void *key, const RID &rid
         void *curKey = (char*)page + offset;
         int curKeyLength = key_length(page->header.attrType, curKey);
 
-        if (compareKey(curKey, key, page->header.attrType) == 0 ) {
+        int compareRes = compareKey(key, curKey, page->header.attrType);
 
-            if (page->header.pageType == LEAF_PAGE_TYPE) {
-                RID curKeyRid = *(RID*)((char*)page + offset + curKeyLength);
+        if (compareRes == 0) {
 
-                if (curKeyRid.pageNum == rid.pageNum && curKeyRid.slotNum == rid.slotNum) {
-                    return offset - sizeof(IXPageHeader);
+            RID curKeyRid = *(RID*)((char*)page + offset + curKeyLength);
 
-                }else {
-                    return -1;
-                }
-
-            }else {
-
+            if (curKeyRid.pageNum == rid.pageNum && curKeyRid.slotNum == rid.slotNum) {
                 return offset - sizeof(IXPageHeader);
+
             }
+        }else if (compareRes < 0) {
+            return -1;
         }
         countNode++;
-        offset += curKeyLength + ridOrPidSize;
+        offset += curKeyLength + sizeof(RID);
     }
 
     return -1;
