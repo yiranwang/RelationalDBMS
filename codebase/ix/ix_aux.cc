@@ -708,11 +708,10 @@ int IndexManager::findInsertOffset(IXPage *page, const void *key, int &countNode
 }
 
 
+// returns the input page
 IXPage* IndexManager::findFirstLeafPage(IXFileHandle &ixfileHandle, IXPage *page) {
-    int pageType = page->header.pageType;
-
     // case 1: input page is a leaf page
-    if (pageType == 1) {
+    if (page->header.pageType == 1) {
         if (page->header.entryCount == 0) {
             unsigned nextPageNum = page->header.nextPageNum;
             ixfileHandle.readPage(nextPageNum, page);
@@ -726,7 +725,9 @@ IXPage* IndexManager::findFirstLeafPage(IXFileHandle &ixfileHandle, IXPage *page
     return findFirstLeafPage(ixfileHandle, page);
 }
 
+
 // search recursively
+// return the input page
 IXPage * IndexManager::findLeafPage(IXFileHandle &ixfileHandle, IXPage *page, const void *key) {
 
     int pageType = page->header.pageType;
@@ -736,54 +737,45 @@ IXPage * IndexManager::findLeafPage(IXFileHandle &ixfileHandle, IXPage *page, co
         return page;
     }
 
-
     // case 2: input page is an index page
     // case 2: compare the keys sequentially
 
-    int nextPageNum = 0;
-    IXPage *nextPage = new IXPage;
 
     // if key < firstKey, skip
-    void* firstKey = (char*)page + sizeof(IXPageHeader);
+    char* firstKey = page->data;
     if (compareKey(key, firstKey, page->header.attrType) < 0) {
-
-        nextPageNum = page->header.leftmostPtr;
-
-        ixfileHandle.readPage(nextPageNum, nextPage);
-
-        return findLeafPage(ixfileHandle, nextPage, key);
+        ixfileHandle.readPage(page->header.leftmostPtr, page);
+        return findLeafPage(ixfileHandle, page, key);
     }
 
     // if key >= lastKey, skip
-    void* lastKey = (char*)page + page->header.lastEntryOffset;
+    char* lastKey = (char*)page + page->header.lastEntryOffset;
     if (compareKey(key, lastKey, page->header.attrType) >= 0) {
-
-        nextPageNum = *(int*)((char*)page + page->header.freeSpaceOffset - sizeof(int));
-        ixfileHandle.readPage(nextPageNum, nextPage);
-        return findLeafPage(ixfileHandle, nextPage, key);
+        unsigned childPageNum = *(int*)((char*)page + page->header.freeSpaceOffset - sizeof(unsigned));
+        ixfileHandle.readPage(childPageNum, page);
+        return findLeafPage(ixfileHandle, page, key);
     }
 
     // if firstKey < key < lastKey
     int keyLength = key_length(page->header.attrType, key);
     int entryCount = page->header.entryCount;
 
-    int offset = sizeof(IXPageHeader);
+    int offset = 0;
 
     for (int i = 0; i < entryCount - 1; i++) {
-        void* curKey = (char*)page + offset;
+        char* curKey = page->data + offset;
         int curKeyLength = key_length(page->header.attrType, curKey);
-        void* nextKey = (char*)page + offset + curKeyLength + sizeof(int);
+        char* nextKey = page->data + offset + curKeyLength + sizeof(unsigned);
 
         if (compareKey(key, curKey, page->header.attrType) >= 0 && compareKey(key, nextKey, page->header.attrType) < 0) {
-            nextPageNum = *(int*)((char*)page + offset + curKeyLength);
-            ixfileHandle.readPage(nextPageNum, nextPage);
-            return findLeafPage(ixfileHandle, nextPage, key);
+            unsigned childPageNum = *(unsigned*)(page->data + offset + curKeyLength);
+            ixfileHandle.readPage(childPageNum, page);
+            return findLeafPage(ixfileHandle, page, key);
         }
-        offset += curKeyLength + sizeof(int);
+        offset += curKeyLength + sizeof(unsigned);
     }
 
-    delete(nextPage);
-
+    delete(page);
     return NULL;
 
 }

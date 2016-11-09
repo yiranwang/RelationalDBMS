@@ -68,13 +68,18 @@ int testCase_12(const string &indexFileName, const Attribute &attribute)
     {
         count++;
 
+
         if (count % 100 == 0) {
             cerr << count << " - Returned rid: " << rid.pageNum << " " << rid.slotNum << endl;
         }
         RC rc = indexManager->deleteEntry(ixfileHandle, attribute, &key, rid);
         assert(rc == success && "indexManager::deleteEntry() should not fail.");
+
+
     }
     cerr << endl;
+
+
 
     // close scan and open scan again
     rc = ix_ScanIterator.close();

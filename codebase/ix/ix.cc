@@ -102,7 +102,7 @@ RC IndexManager::scan(IXFileHandle &ixfileHandle,
         bool        	highKeyInclusive,
         IX_ScanIterator &ix_ScanIterator) {
 
-
+    // validate fileHandle
     if (ixfileHandle.fileHandle.fd < 0) {
         return -1;
     }
@@ -111,6 +111,10 @@ RC IndexManager::scan(IXFileHandle &ixfileHandle,
     ix_ScanIterator.open = true;
     ix_ScanIterator.ixfh = ixfileHandle;
     ix_ScanIterator.attrType = attribute.type;
+    ix_ScanIterator.latestFreeSpaceSize = -1;
+    ix_ScanIterator.pageOfNextEntry = 0;
+    ix_ScanIterator.offsetOfCurrentEntry = -1;
+
 
     // copy lowKey
     if (!lowKey) {
@@ -133,7 +137,7 @@ RC IndexManager::scan(IXFileHandle &ixfileHandle,
     ix_ScanIterator.lowKeyInclusive = lowKeyInclusive;
     ix_ScanIterator.highKeyInclusive = highKeyInclusive;
 
-    // fetch directory page
+    // fetch directory page, get root pageNum
     IXPage *dirPage = new IXPage;
     ixfileHandle.readPage(0, dirPage);
     unsigned rootPageNum = dirPage->header.leftmostPtr;
@@ -143,57 +147,42 @@ RC IndexManager::scan(IXFileHandle &ixfileHandle,
     IXPage *rootPage = new IXPage;
     ixfileHandle.readPage(rootPageNum, rootPage);
 
-
-    // fetch first leaf page if lowKey == NULL
+    // locate first leaf page if lowKey == NULL
     if (lowKey == NULL) {
         IXPage *targetLeafPage = findFirstLeafPage(ixfileHandle, rootPage);
-        ix_ScanIterator.nextEid.pageNum = targetLeafPage->header.pageNum;
-        ix_ScanIterator.nextEid.slotNum = 0;
+        ix_ScanIterator.pageOfNextEntry = targetLeafPage->header.pageNum;
+        ix_ScanIterator.offsetOfNextEntry = 0;
         delete targetLeafPage;
         return 0;
     }
 
-
-
-    // fetch the leaf page that MAY contain the data entry
-    IXPage *targetLeafPage = findLeafPage(ixfileHandle, rootPage, lowKey);
-    delete rootPage;
-
-    // search for the data entry satisfying low key
-    char* entryPtr = (char*)targetLeafPage + sizeof(IXPageHeader);
-    unsigned entryNum = 0;
-    while (entryNum < targetLeafPage->header.entryCount && compareKey(entryPtr, lowKey, attribute.type) < 0) {
-
-        int keyLen = attribute.type == TypeVarChar ? sizeof(int) + *(int*)entryPtr : sizeof(int);
-        entryPtr += keyLen + sizeof(RID);
-        entryNum++;
-    }
-
-
-
-    RID tmpNextEid = {};
-
-    // if all data entries on this leaf page have been examined, set 0th entry on next page as the next data entry
-    if (entryNum == targetLeafPage->header.entryCount) {
-        tmpNextEid.pageNum = targetLeafPage->header.nextPageNum;
-        tmpNextEid.slotNum = 0;
-    }
-    // else the matched data entry is on this page
+    // otherwise fetch the leaf page that MAY contain the data entry
     else {
 
-        // decide if this data entry can considered as the next data entry
-        if  (compareKey(entryPtr, lowKey, attribute.type) == 0 && !lowKeyInclusive) {
+        IXPage *targetLeafPage = findLeafPage(ixfileHandle, rootPage, lowKey);
+        ix_ScanIterator.pageOfNextEntry = targetLeafPage->header.pageNum;
+        ix_ScanIterator.offsetOfNextEntry = 0;
+
+        // search for the data entry satisfying low key, offset counted from page->data
+        char *entryPtr = targetLeafPage->data;
+        unsigned entryNum = 0;
+
+        while (entryNum < targetLeafPage->header.entryCount && compareKey(entryPtr, lowKey, attribute.type) < 0) {
+            int keyLen = attribute.type == TypeVarChar ? sizeof(int) + *(int *) entryPtr : sizeof(int);
+            entryPtr += keyLen + sizeof(RID);
             entryNum++;
+            ix_ScanIterator.offsetOfNextEntry += keyLen + sizeof(RID);
         }
-        tmpNextEid.pageNum = targetLeafPage->header.pageNum;
-        tmpNextEid.slotNum = entryNum;
+
+        // if all data entries on this leaf page have been examined
+        if (entryNum == targetLeafPage->header.entryCount) {
+            ix_ScanIterator.pageOfNextEntry = targetLeafPage->header.nextPageNum;
+            ix_ScanIterator.offsetOfNextEntry = 0;
+        }
+
+        delete targetLeafPage;
+        return 0;
     }
-
-    ix_ScanIterator.nextEid.pageNum = tmpNextEid.pageNum;
-    ix_ScanIterator.nextEid.slotNum = tmpNextEid.slotNum;
-
-
-    return 0;
 
 }
 

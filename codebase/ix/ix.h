@@ -77,10 +77,12 @@ public:
 class IX_ScanIterator {
 public:
     bool open;
-    bool isEOF;
     IXFileHandle ixfh;
     AttrType attrType;
-    RID nextEid;                // rid of the next data entry
+    unsigned pageOfNextEntry;
+    short offsetOfNextEntry;                // offset inside page->data
+    short offsetOfCurrentEntry;             // offset inside page->data
+    short latestFreeSpaceSize;              // used to check if a deleted happened after getNext
 
     void    *lowKey;
     void    *highKey;

@@ -4,7 +4,6 @@
 
 
 IX_ScanIterator::IX_ScanIterator() {
-    isEOF = false;
     open = false;
 }
 
@@ -19,33 +18,57 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key) {
         return -1;
     }
 
-    if (isEOF) {
-        if (DEBUG) printf("EOF is reached\n");
-        return IX_EOF;
+
+    // fetch the leaf page
+    IXPage *targetLeafPage = new IXPage;
+    ixfh.readPage(pageOfNextEntry, targetLeafPage);
+
+
+    // first time reading leaf page
+    if (offsetOfNextEntry == 0) {
+        latestFreeSpaceSize = targetLeafPage->header.freeSpaceSize;
+    } else {
+        // this page has been changed (entry deleted)
+        if (latestFreeSpaceSize != targetLeafPage->header.freeSpaceSize) {
+            offsetOfNextEntry = offsetOfCurrentEntry;
+            latestFreeSpaceSize = targetLeafPage->header.freeSpaceSize;
+        }
     }
 
+    // if reach the end of target leaf page
+    if (offsetOfNextEntry == targetLeafPage->header.freeSpaceOffset - sizeof(IXPageHeader)) {
+        // if this is the last leaf page
+        if (targetLeafPage->header.nextPageNum == targetLeafPage->header.pageNum) {
+            return IX_EOF;
+        }
 
+        pageOfNextEntry = targetLeafPage->header.nextPageNum;
+        offsetOfNextEntry = 0;
+        delete(targetLeafPage);
+        return getNextEntry(rid, key);
+    }
 
-    // fetch the leaf page indicated by the nextEid
-    IXPage *targetLeafPage = new IXPage;
-    ixfh.readPage(nextEid.pageNum, targetLeafPage);
 
     // locate the target data entry
-    char* entryPtr = (char*)targetLeafPage + sizeof(IXPageHeader);
-    unsigned entryNum = 0;
-    while (entryNum < nextEid.slotNum) {
-        int keyLen = attrType == TypeVarChar ? sizeof(int) + *(int*)entryPtr : sizeof(int);
-        entryPtr += keyLen + sizeof(RID);
-        entryNum++;
-    }
+    IndexManager *ixm = IndexManager::instance();
+    char* entryPtr = targetLeafPage->data + offsetOfNextEntry;
+    int keyLen = ixm->key_length(attrType, entryPtr);
 
+    int cmpResult = ixm->compareKey(entryPtr, key, attrType);
+
+    // only used when first time call getNext
+    if (cmpResult < 0 || (cmpResult == 0 && !lowKeyInclusive)){
+        delete(targetLeafPage);
+        offsetOfCurrentEntry = offsetOfNextEntry;
+        offsetOfNextEntry += keyLen + sizeof(RID);
+        return getNextEntry(rid, key);
+    }
 
 
     // if highkey == NULL, scan all the records after low key
     // otherwise check ending condition
     if (highKey != NULL) {
-        IndexManager *ixm = IndexManager::instance();
-        int cmpResult = ixm->compareKey(entryPtr, highKey, attrType);
+        cmpResult = ixm->compareKey(entryPtr, highKey, attrType);
         // entryKey > high key or entryKey == high key but not inclusive, return EOF
         if (cmpResult > 0 || (cmpResult == 0 && !highKeyInclusive)) {
             delete targetLeafPage;
@@ -54,24 +77,13 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key) {
     }
 
     // find key length of the target entry and copy entry out
-    int entryKeyLen = attrType == TypeVarChar ? sizeof(int) + *(int*)entryPtr : sizeof(int);
-    memcpy(key, entryPtr, (size_t)entryKeyLen);
-    memcpy(&rid, entryPtr + entryKeyLen, sizeof(RID));
+    memcpy(key, entryPtr, (size_t)keyLen);
+    memcpy(&rid, entryPtr + keyLen, sizeof(RID));
 
 
-    nextEid.slotNum++;
-    if (nextEid.slotNum == targetLeafPage->header.entryCount) {
-
-        // if this page is the last leaf page, flag IX_EOF, so next call will return EOF
-        if (targetLeafPage->header.nextPageNum == targetLeafPage->header.pageNum) {
-            isEOF = true;
-            delete targetLeafPage;
-            return 0;
-        }
-        nextEid.pageNum = targetLeafPage->header.nextPageNum;
-        nextEid.slotNum = 0;
-    }
-
+    offsetOfCurrentEntry = offsetOfNextEntry;
+    offsetOfNextEntry += keyLen + sizeof(RID);
+    latestFreeSpaceSize = targetLeafPage->header.freeSpaceSize;
     delete targetLeafPage;
     return 0;
 }
