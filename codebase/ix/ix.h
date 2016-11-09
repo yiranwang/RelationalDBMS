@@ -165,10 +165,13 @@ class IndexManager {
         IXPage *findFirstLeafPage(IXFileHandle &ixfileHandle, IXPage *page);
         IXPage *findLeafPage(IXFileHandle &ixfileHandle, IXPage *page, const void *key);
 
+        void deleteEntryFromPage(IXPage *page, short deleteOffset);
+        bool redistribute2Pages(IXPage *leftPage, IXPage *rightPage);
 
 
 
-    protected:
+
+protected:
         IndexManager();
         ~IndexManager();
 
