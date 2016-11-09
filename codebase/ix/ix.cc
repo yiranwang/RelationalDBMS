@@ -76,12 +76,12 @@ RC IndexManager::deleteEntry(IXFileHandle &ixfileHandle, const Attribute &attrib
     IXPage *dirPage = new IXPage;
     ixfileHandle.readPage(0, dirPage);
 
-    int rootPageNumber = dirPage->header.leftmostPtr;
+    unsigned rootPageNumber = dirPage->header.leftmostPtr;
+    delete(dirPage);
 
     IXPage *rootPage = new IXPage;
     ixfileHandle.readPage(rootPageNumber, rootPage);
 
-    delete(dirPage);
 
     void *newChildEntry = NULL;
 

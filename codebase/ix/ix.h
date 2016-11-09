@@ -22,8 +22,8 @@ typedef struct {
     unsigned pageNum;
     unsigned parent;                // parent index             NOT MAINTAINED !!!
     unsigned leftmostPtr;           // leftmost pointer; when this is a directory page, it's used to point to root page
-    unsigned prevPageNum;           // double linked list only used in leaf page
-    unsigned nextPageNum;
+    unsigned prevPageNum;           // double linked list only used in leaf page, pointed to itself for 1st page
+    unsigned nextPageNum;           // double linked list only used in leaf page, pointed to itself for last page
 
     bool isRoot;
 

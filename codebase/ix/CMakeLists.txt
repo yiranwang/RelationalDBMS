@@ -20,6 +20,9 @@ target_link_libraries(ixtest_02 ix rbf rm)
 add_executable(ixtest_03 ixtest_03.cc)
 target_link_libraries(ixtest_03 ix rbf rm)
 
+add_executable(ixtest_04 ixtest_04.cc)
+target_link_libraries(ixtest_04 ix rbf rm)
+
 add_executable(ixtest_05 ixtest_05.cc)
 target_link_libraries(ixtest_05 ix rbf rm)
 
@@ -49,3 +52,6 @@ target_link_libraries(ixtest_13 ix rbf rm)
 
 add_executable(ixtest_14 ixtest_14.cc)
 target_link_libraries(ixtest_14 ix rbf rm)
+
+add_executable(ixtest_15 ixtest_15.cc)
+target_link_libraries(ixtest_15 ix rbf rm)

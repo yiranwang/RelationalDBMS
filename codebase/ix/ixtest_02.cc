@@ -21,9 +21,6 @@ int testCase_2(const string &indexFileName, const Attribute &attribute)
     // NOTE: "**" signifies the new functions being tested in this test case.
     cerr << endl << "***** In IX Test Case 2 *****" << endl;
 
-
-    printf("The size of ixpage header is %lu\n",  sizeof(IXPageHeader));
-
     RID rid;
     int key = 200;
     rid.pageNum = 500;
