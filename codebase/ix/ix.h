@@ -155,8 +155,9 @@ class IndexManager {
         int findInsertOffsetInNonLeafPage(IXPage *page, const void *key, int &countNode);
         int findInsertOffset(IXPage *page, const void *key, int &countNode);
 
+        int findDeleteOffsetInIndexPage(IXPage *page, const void *entry);
         int findDeleteOffset(IXPage *page, const void *key, const RID &rid, int &countNode);
-        int findEntryOffsetInIndexPage(IXPage *parentPage, const void *key);
+        int findEntryOffsetInIndexPage(IXPage *parentPage, unsigned childPid);
 
         IXPage *findNextPage(IXFileHandle &ixfileHandle, IXPage *page, const void *key);
 
