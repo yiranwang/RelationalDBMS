@@ -158,7 +158,6 @@ RC IndexManager::scan(IXFileHandle &ixfileHandle,
 
     // otherwise fetch the leaf page that MAY contain the data entry
     else {
-
         IXPage *targetLeafPage = findLeafPage(ixfileHandle, rootPage, lowKey);
         ix_ScanIterator.pageOfNextEntry = targetLeafPage->header.pageNum;
         ix_ScanIterator.offsetOfNextEntry = 0;
@@ -167,6 +166,7 @@ RC IndexManager::scan(IXFileHandle &ixfileHandle,
         char *entryPtr = targetLeafPage->data;
         unsigned entryNum = 0;
 
+        // find the first key >= lowKey
         while (entryNum < targetLeafPage->header.entryCount && compareKey(entryPtr, lowKey, attribute.type) < 0) {
             int keyLen = attribute.type == TypeVarChar ? sizeof(int) + *(int *) entryPtr : sizeof(int);
             entryPtr += keyLen + sizeof(RID);

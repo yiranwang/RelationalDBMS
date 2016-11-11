@@ -2054,10 +2054,3 @@ void IndexManager::DFSPrintBTree(int pageNum, IXFileHandle &ixfileHandle, const 
     delete(page);
 }
 
-
-
-
-
-
-
-
