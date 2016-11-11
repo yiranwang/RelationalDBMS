@@ -107,6 +107,7 @@ RC IndexManager::scan(IXFileHandle &ixfileHandle,
         return -1;
     }
 
+
     // initialize ixsi
     ix_ScanIterator.open = true;
     ix_ScanIterator.ixfh = ixfileHandle;
@@ -137,6 +138,7 @@ RC IndexManager::scan(IXFileHandle &ixfileHandle,
     ix_ScanIterator.lowKeyInclusive = lowKeyInclusive;
     ix_ScanIterator.highKeyInclusive = highKeyInclusive;
 
+
     // fetch directory page, get root pageNum
     IXPage *dirPage = new IXPage;
     ixfileHandle.readPage(0, dirPage);
@@ -146,6 +148,11 @@ RC IndexManager::scan(IXFileHandle &ixfileHandle,
     // fetch root page
     IXPage *rootPage = new IXPage;
     ixfileHandle.readPage(rootPageNum, rootPage);
+
+    if (rootPage->header.entryCount == 0) {
+        delete(rootPage);
+        return 0;
+    }
 
     // locate first leaf page if lowKey == NULL
     if (lowKey == NULL) {

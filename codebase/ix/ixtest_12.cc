@@ -62,13 +62,13 @@ int testCase_12(const string &indexFileName, const Attribute &attribute)
     rc = indexManager->scan(ixfileHandle, attribute, &compVal, &compVal, true, true, ix_ScanIterator);
     assert(rc == success && "indexManager::scan() should not fail.");
 
+    indexManager->printBtree(ixfileHandle, attribute);
+
     // Delete entries in IndexScan Iterator
     unsigned count = 0;
     while(ix_ScanIterator.getNextEntry(rid, &key) == success)
     {
         count++;
-
-
         if (count % 100 == 0) {
             cerr << count << " - Returned rid: " << rid.pageNum << " " << rid.slotNum << endl;
         }
@@ -79,6 +79,7 @@ int testCase_12(const string &indexFileName, const Attribute &attribute)
     }
     cerr << endl;
 
+    indexManager->printBtree(ixfileHandle, attribute);
 
 
     // close scan and open scan again

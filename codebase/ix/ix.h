@@ -170,6 +170,7 @@ class IndexManager {
 
         void deleteEntryFromPage(IXPage *page, short deleteOffset);
         bool redistribute2Pages(IXPage *leftPage, IXPage *rightPage);
+        bool redistribute2IndexPages(IXFileHandle &ixFileHandle, IXPage *leftPage, IXPage *rightPage, IXPage *parentPage);
 
 
 

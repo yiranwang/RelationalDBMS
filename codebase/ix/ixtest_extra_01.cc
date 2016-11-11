@@ -9,93 +9,89 @@
 
 IndexManager *indexManager;
 
-int testCase_8(const string &indexFileName, const Attribute &attribute)
+int testCase_extra_1(const string &indexFileName, const Attribute &attribute)
 {
+    // Checks whether duplicated entries spanning multiple page are handled properly or not.
+    //
     // Functions tested
-    // 1. Create Index File
-    // 2. Open Index File
+    // 1. Create Index
+    // 2. OpenIndex
     // 3. Insert entry
-    // 4. Scan entries using GE_OP operator and checking if the values returned are correct. **
+    // 4. Scan entries (EXACT MATCH).
     // 5. Scan close
-    // 6. Close Index File
-    // 7. Destroy Index File
+    // 6. CloseIndex
+    // 7. DestroyIndex
     // NOTE: "**" signifies the new functions being tested in this test case.
-    cerr << endl << "***** In IX Test Case 8 *****" << endl;
+    cerr << endl << "***** In IX Test Extra Case 1 *****" << endl;
 
     RID rid;
+    unsigned numOfTuples = 2000;
+    unsigned numExtra = 1000;
+    unsigned key;
     IXFileHandle ixfileHandle;
     IX_ScanIterator ix_ScanIterator;
-    unsigned numOfTuples = 300;
-    unsigned numOfMoreTuples = 100;
-    unsigned key;
-    int inRidSlotNumSum = 0;
-    int outRidSlotNumSum = 0;
-    unsigned value = 7001;
+    int compVal1 = 1234, compVal2 = 4321;
+    unsigned count = 0;
 
-    // create index file
+    //create index file(s)
     RC rc = indexManager->createFile(indexFileName);
     assert(rc == success && "indexManager::createFile() should not fail.");
 
-    // open index file
+    //open index file
     rc = indexManager->openFile(indexFileName, ixfileHandle);
     assert(rc == success && "indexManager::openFile() should not fail.");
 
-    // insert Entries
+    // insert entry
+    key = compVal1;
     for(unsigned i = 1; i <= numOfTuples; i++)
     {
-        key = i;
-        rid.pageNum = key;
-        rid.slotNum = key * 3;
+        rid.pageNum = i;
+        rid.slotNum = i;
 
         rc = indexManager->insertEntry(ixfileHandle, attribute, &key, rid);
         assert(rc == success && "indexManager::insertEntry() should not fail.");
     }
 
-    // Insert more entries
-    for(unsigned i = value; i < value + numOfMoreTuples; i++)
+    indexManager->printBtree(ixfileHandle, attribute);
+
+    key = compVal2;
+    for(unsigned i = numOfTuples; i < numOfTuples+ numExtra; i++)
     {
-        key = i;
-        rid.pageNum = key;
-        rid.slotNum = key * 3;
+        rid.pageNum = i;
+        rid.slotNum = i - 5;
 
         rc = indexManager->insertEntry(ixfileHandle, attribute, &key, rid);
         assert(rc == success && "indexManager::insertEntry() should not fail.");
-
-        inRidSlotNumSum += rid.slotNum;
     }
 
-    //indexManager->printBtree(ixfileHandle, attribute);
+    indexManager->printBtree(ixfileHandle, attribute);
 
-    // Scan
-    rc = indexManager->scan(ixfileHandle, attribute, &value, NULL, true, true, ix_ScanIterator);
+    // scan
+    rc = indexManager->scan(ixfileHandle, attribute, &compVal1, &compVal1, true, true, ix_ScanIterator);
     assert(rc == success && "indexManager::scan() should not fail.");
 
-    // IndexScan iterator
-    unsigned count = 0;
+    // iterate
+    count = 0;
     while(ix_ScanIterator.getNextEntry(rid, &key) == success)
     {
         count++;
 
-        if (rid.pageNum % 100 == 0) {
+        if (rid.pageNum != rid.slotNum) {
+            cerr << "Wrong entries output... The test failed" << endl;
+        }
+
+        if(count % 100 == 0) {
             cerr << count << " - Returned rid: " << rid.pageNum << " " << rid.slotNum << endl;
         }
-        if (rid.pageNum < value || rid.slotNum < value * 3)
-        {
-            cerr << "Wrong entries output... The test failed" << endl;
-            rc = ix_ScanIterator.close();
-            rc = indexManager->closeFile(ixfileHandle);
-            rc = indexManager->destroyFile(indexFileName);
-            return fail;
-        }
-        outRidSlotNumSum += rid.slotNum;
     }
 
-    // Inconsistency check
-    if (inRidSlotNumSum != outRidSlotNumSum)
+    cerr << "Number of scanned entries: " << count << endl;
+    if (count != numOfTuples)
     {
         cerr << "Wrong entries output... The test failed" << endl;
         rc = ix_ScanIterator.close();
         rc = indexManager->closeFile(ixfileHandle);
+        rc = indexManager->destroyFile(indexFileName);
         return fail;
     }
 
@@ -112,12 +108,11 @@ int testCase_8(const string &indexFileName, const Attribute &attribute)
     assert(rc == success && "indexManager::destroyFile() should not fail.");
 
     return success;
-
 }
 
 int main()
 {
-    // Global Initialization
+    //Global Initializations
     indexManager = IndexManager::instance();
 
     const string indexFileName = "age_idx";
@@ -126,14 +121,12 @@ int main()
     attrAge.name = "age";
     attrAge.type = TypeInt;
 
-    remove("age_idx");
-
-    RC result = testCase_8(indexFileName, attrAge);
+    RC result = testCase_extra_1(indexFileName, attrAge);
     if (result == success) {
-        cerr << "***** IX Test Case 8 finished. The result will be examined. *****" << endl;
+        cerr << "IX_Test Case Extra 1 finished. The result will be examined." << endl;
         return success;
     } else {
-        cerr << "***** [FAIL] IX Test Case 8 failed. *****" << endl;
+        cerr << "IX_Test Case Extra 1 failed." << endl;
         return fail;
     }
 
