@@ -1,8 +1,8 @@
 
-#include <cstdlib>
 #include "ix.h"
-#include "../rbf/rbfm.h"
 #include<iostream>
+
+using namespace std;
 
 int IndexManager::key_length(const AttrType attrType, const void* key){
     if(attrType == TypeVarChar){

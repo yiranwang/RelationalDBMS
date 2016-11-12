@@ -2,9 +2,7 @@
 #ifndef _ix_h_
 #define _ix_h_
 
-#include <vector>
-#include <string>
-#include <cstdlib>
+
 
 #include "../rbf/rbfm.h"
 

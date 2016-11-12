@@ -1,10 +1,6 @@
 #ifndef _rbfm_h_
 #define _rbfm_h_
 
-#include <string>
-#include <vector>
-#include <climits>
-
 #include "../rbf/pfm.h"
 
 using namespace std;

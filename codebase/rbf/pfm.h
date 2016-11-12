@@ -12,9 +12,13 @@ typedef char byte;
 #define HEADER_SIZE 96
 #define DATA_SIZE 4000
 
-
-#include <string>
 #include <climits>
+
+#include <vector>
+#include <string>
+#include <cstring>
+#include <cstdlib>
+
 using namespace std;
 
 // ========= Start of self defined structures ==========

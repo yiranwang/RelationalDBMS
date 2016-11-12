@@ -1,7 +1,7 @@
 
 #include "ix.h"
-#include "../rbf/rbfm.h"
 
+using namespace std;
 
 IX_ScanIterator::IX_ScanIterator() {
     open = false;

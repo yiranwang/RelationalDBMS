@@ -1,6 +1,7 @@
 
 #include "ix.h"
-#include "../rbf/rbfm.h"
+
+using namespace std;
 
 IndexManager* IndexManager::_index_manager = 0;
 
