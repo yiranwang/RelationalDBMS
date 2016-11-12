@@ -1023,6 +1023,9 @@ void IndexManager::deleteEntryFromPage(IXPage *page, short deleteOffset) {
 
 
 int IndexManager::deleteTree(IXFileHandle &ixfileHandle, IXPage *page, const void *key, const RID &rid, void* &oldChildEntry) {
+    if (page->header.entryCount == 0) {
+        return -1;
+    }
 
     char pageType = page->header.pageType;
     int freeSpaceCapacity = PAGE_SIZE - sizeof(IXPageHeader);
