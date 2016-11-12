@@ -36,18 +36,7 @@
     </ADDITIONAL_GENERATION_ENVIRONMENT>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="2d48d6bb-70f0-4e37-8294-909fdc8eac0a" name="Default" comment="">
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/codebase/ix/CMakeLists.txt" afterPath="$PROJECT_DIR$/codebase/ix/CMakeLists.txt" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/codebase/ix/ix.cc" afterPath="$PROJECT_DIR$/codebase/ix/ix.cc" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/codebase/ix/ix.h" afterPath="$PROJECT_DIR$/codebase/ix/ix.h" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/codebase/ix/ix_aux.cc" afterPath="$PROJECT_DIR$/codebase/ix/ix_aux.cc" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/codebase/ix/ixtest_08.cc" afterPath="$PROJECT_DIR$/codebase/ix/ixtest_08.cc" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/codebase/ix/ixtest_10.cc" afterPath="$PROJECT_DIR$/codebase/ix/ixtest_10.cc" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/codebase/ix/ixtest_11.cc" afterPath="$PROJECT_DIR$/codebase/ix/ixtest_11.cc" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/codebase/ix/ixtest_12.cc" afterPath="$PROJECT_DIR$/codebase/ix/ixtest_12.cc" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/codebase/ix/ixtest_13.cc" afterPath="$PROJECT_DIR$/codebase/ix/ixtest_13.cc" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/codebase/rbf/pfm.h" afterPath="$PROJECT_DIR$/codebase/rbf/pfm.h" />
-    </list>
+    <list default="true" id="2d48d6bb-70f0-4e37-8294-909fdc8eac0a" name="Default" comment="" />
     <ignored path="cs222.iws" />
     <ignored path=".idea/workspace.xml" />
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -206,7 +195,7 @@
   </component>
   <component name="ProjectFrameBounds">
     <option name="x" value="6" />
-    <option name="y" value="24" />
+    <option name="y" value="23" />
     <option name="width" value="1158" />
     <option name="height" value="721" />
   </component>
@@ -628,25 +617,25 @@
       <workItem from="1478215673529" duration="87960000" />
       <workItem from="1478563632088" duration="22383000" />
       <workItem from="1478636997097" duration="7226000" />
-      <workItem from="1478675541740" duration="44853000" />
+      <workItem from="1478675541740" duration="45399000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="164741000" />
+    <option name="totallyTimeSpent" value="165287000" />
   </component>
   <component name="ToolWindowManager">
-    <frame x="6" y="24" width="1158" height="721" extended-state="0" />
+    <frame x="6" y="23" width="1158" height="721" extended-state="0" />
     <editor active="false" />
     <layout>
-      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.19261214" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
+      <window_info id="Project" active="true" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.19261214" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
       <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
       <window_info id="Messages" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4499205" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="CMake" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.16693164" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="true" content_ui="tabs" />
       <window_info id="Find" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32591414" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
-      <window_info id="Run" active="true" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.31319556" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
+      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.31319556" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3290938" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Favorites" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="true" content_ui="tabs" />
