@@ -65,8 +65,6 @@ int testCase_13(const string &indexFileName, const Attribute &attribute)
             numOfTuplesTobeScanned++;
         }
     }
-
-    indexManager->printBtree(ixfileHandle, attribute);
     
     // insert more entries
     *(int *)key = tested_ascii;
@@ -83,8 +81,6 @@ int testCase_13(const string &indexFileName, const Attribute &attribute)
         
         numOfTuplesTobeScanned++;
     }
-
-    //indexManager->printBtree(ixfileHandle, attribute);
 
     // collect counter
     // we will eyeball those numbers to see if they are reasonable.

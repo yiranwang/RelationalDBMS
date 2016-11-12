@@ -60,8 +60,6 @@ int testCase_10(const string &indexFileName, const Attribute &attribute)
     rc = indexManager->scan(ixfileHandle, attribute, &key1, &key1, true, true, ix_ScanIterator);
     assert(rc == success && "indexManager::scan() should not fail.");
 
-    indexManager->printBtree(ixfileHandle, attribute);
-
     // iterate
     unsigned count = 0;
     while(ix_ScanIterator.getNextEntry(rid, &key1) == success)

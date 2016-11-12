@@ -52,8 +52,6 @@ int testCase_extra_1(const string &indexFileName, const Attribute &attribute)
         assert(rc == success && "indexManager::insertEntry() should not fail.");
     }
 
-    indexManager->printBtree(ixfileHandle, attribute);
-
     key = compVal2;
     for(unsigned i = numOfTuples; i < numOfTuples+ numExtra; i++)
     {
@@ -63,8 +61,6 @@ int testCase_extra_1(const string &indexFileName, const Attribute &attribute)
         rc = indexManager->insertEntry(ixfileHandle, attribute, &key, rid);
         assert(rc == success && "indexManager::insertEntry() should not fail.");
     }
-
-    indexManager->printBtree(ixfileHandle, attribute);
 
     // scan
     rc = indexManager->scan(ixfileHandle, attribute, &compVal1, &compVal1, true, true, ix_ScanIterator);
