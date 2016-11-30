@@ -95,47 +95,35 @@ RC RBFM_ScanIterator::close() {
 RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) { 
 
 	// conditionAttribute not exist and not NO_OP, just return -1
-	if (conditionAttrIndex == recordDescriptor.size() && op != NO_OP) {
+	if (!opened || (conditionAttrIndex == recordDescriptor.size() && op != NO_OP)) {
 		return RBFM_EOF;
-	}
-
-	if (DEBUG) printf("Scanning ...next RID = (%d, %d)\n", nextRid.pageNum, nextRid.slotNum);
-
-	if (!opened) {
-		if(DEBUG) printf("Sorry, RBFM_ScanIterator is not opened!\n");
-		return -1;
 	}
 
 
 	RecordBasedFileManager *rbfm = RecordBasedFileManager::instance();
 
 	// case 1: pageNum >= totalPageNum
-	unsigned totalPageNum = fileHandle.getNumberOfPages();
-	if (nextRid.pageNum >= totalPageNum) {
-		if(DEBUG) printf("RBFM_EOF reached!\n");
+	if (nextRid.pageNum >= fileHandle.getNumberOfPages()) {
 		return RBFM_EOF;
 	}
 
 	// read out the page
 	Page *page = new Page;
 	if (fileHandle.readPage(nextRid.pageNum, page) < 0) {
-		if (DEBUG) printf("fileHandle.readPage(%d) < 0!\n", nextRid.pageNum);
 		delete page;
 		return -1;
 	}
 
-	short slotCount = page->header.slotCount;
+	;
 
 	// case 2: invalid slotNum
-	if (nextRid.slotNum > (short)slotCount) {
-		if (DEBUG) printf("nextRid.slotNum:%d >= slotCount:%d\nSo record to be read does not exist\n", nextRid.slotNum, slotCount);
+	if (nextRid.slotNum > page->header.slotCount) {
 		delete page;
 		return -1;
 	}
 
 	// case 3: previous record visited is the last one on this page, need to scan next page
-	if (nextRid.slotNum == (unsigned)slotCount) {
-		if (DEBUG) printf("previous record visited is the last one on this page, go to the 1st record on the next page\n");
+	if (nextRid.slotNum == (unsigned)(page->header.slotCount)) {
 		nextRid.pageNum += 1;
 		nextRid.slotNum = 0;
 		delete page;
@@ -147,12 +135,10 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
 	Slot targetSlot = {};
 
 	// read out the slot
-	rbfm->readSlotFromPage(page, nextRid.slotNum, targetSlot);
-	//printf("slot read out: offset = %d, length = %d!\n", targetSlot.offset, targetSlot.length);
+	rbfm->readSlotFromPage(page, (short)nextRid.slotNum, targetSlot);
 
 	// case 4.1: the next slot points to a deleted record or it's redirected from somewhere else, skip it
 	if (targetSlot.offset == -1 || targetSlot.isRedirected != 0) {
-		if (DEBUG) printf("the slot points to a deleted or redirected record, skip it\n");
 		delete page;
 		nextRid.slotNum += 1;						// go for next slot
 		return getNextRecord(rid, data);
@@ -164,62 +150,44 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
 	// case 4.2: the target record is on this page
 
 	// read out the inner record
-	// printf("allocating memory for tmpInnerRecord ...\n");
 	void *tmpInnerRecord = malloc(PAGE_SIZE);
-
-	//printf("tmpInnerRecord malloc(PAGE_SIZE) done\n");
-	//memset(tmpInnerRecord, 0, PAGE_SIZE);
+    memset(tmpInnerRecord, 0, PAGE_SIZE);
 	rbfm->readRecordFromPage(page, targetSlot.offset, targetSlot.length, tmpInnerRecord);
-
-	//printf("inner record read out!\n");
+    delete page;
 
 	// comparison is needed only if op != NO_OP
 	// conditionAttriIndex is a valid index now, otherwise -1 is returned at the beginning of this function
 	if (op != NO_OP) {
 		// read out the attribute value to be compared
-		Attribute conditionAttr = recordDescriptor[conditionAttrIndex];				
-		void *attributeData = malloc(PAGE_SIZE);
+		void *attributeData = malloc(300);
+        memset(attributeData, 0, 300);
 		rbfm->readAttributeFromInnerRecord(recordDescriptor, tmpInnerRecord, conditionAttrIndex, attributeData);
-
-		//printf("attribute read out!\n");
 
 		// attributeData's 1st byte is nullIndicator: 10000000 means it's NULL
 		// case 4.2.1: this attribute is NULL or condition not met, skip this record
-		if (*(unsigned char*)attributeData != 0 || !opCompare((char*)attributeData + 1, value, op, conditionAttr.type)) {
-			if (DEBUG) printf("this attribute is NULL or condition not met, skip this record\n");
-			delete page;
+		if (*(unsigned char*)attributeData != 0 ||
+                !opCompare((char*)attributeData + 1, value, op, (recordDescriptor[conditionAttrIndex]).type)) {
+
 			free(tmpInnerRecord);
 			free(attributeData);
 			nextRid.slotNum += 1;						// go for next slot
 			return getNextRecord(rid, data);
 		}
-		free(attributeData);
+        free(attributeData);
 	}
+    // case 4.2.2: condition met, compose a tuple of this record into data
+    short tupleSize = 0;
+    rbfm->composeApiTuple(recordDescriptor, projectedDescriptorIndex, tmpInnerRecord, data, tupleSize);
 
+    rid.pageNum = nextRid.pageNum;
+    rid.slotNum = nextRid.slotNum;
 
-	//printf("[Condition met!]\n");
-	// case 4.2.2: condition met, compose a tuple of this record into data
-	short tupleSize = 0;
-	rbfm->composeApiTuple(recordDescriptor, projectedDescriptorIndex, tmpInnerRecord, data, tupleSize);
-	
-	//printf("\n[Condition Met] the tuple is from this record at RID(%d, %d):\n", nextRid.pageNum, nextRid.slotNum);
-	//rbfm->printInnerRecord(recordDescriptor, tmpInnerRecord);
-	//printf("\n");
-	
+    free(tmpInnerRecord);
 
-	//printf("Next qualified tuple is:\n");
-	//rbfm->printRecord(projectedDescriptor, data);
+    nextRid.slotNum += 1;						// go for next slot
 
-	rid.pageNum = nextRid.pageNum;
-	rid.slotNum = nextRid.slotNum;
-	delete page;
-	free(tmpInnerRecord);
+    return 0;
 
-	//printf("free tmpInnerRecord and attributeData done\n");
-	nextRid.slotNum += 1;						// go for next slot
-
-	//printf("------------------------------------------------------\n");
-	return 0;
 };
 
 
@@ -234,29 +202,35 @@ bool RBFM_ScanIterator::opCompare(void* ref1, void* ref2, CompOp op, AttrType ty
     	return false;
     }
     if (type == TypeVarChar) {
-    	//printf("comparing %s and %s\n", (char*)ref1, (char*)ref2);
-		int len1 = *(int*)((char*)ref1);
-        int len2 = *(int*)((char*)ref2);
+		int len1 = *(int*)ref1;
+        int len2 = *(int*)ref2;
 
-        void *stemp1 = malloc(len1 + 1);
-        void *stemp2 = malloc(len2 + 1);
+        //char *stemp1 = (char*)malloc(len1 + 1);
+        //char *stemp2 = (char*)malloc(len2 + 1);
 
+        char stemp1[len1 + 1];
+        char stemp2[len2 + 1];
         memcpy(stemp1, (char*)ref1 + sizeof(int), len1);
         memcpy(stemp2, (char*)ref2 + sizeof(int), len2);
 
-        ((char*)stemp1)[len1] = '\0';
-        ((char*)stemp2)[len2] = '\0';
+        //*(stemp1 + len1 + 1) = '\0';
+        //*(stemp2 + len2 + 1) = '\0';
 
-		string str1((char*)stemp1);
-		string str2((char*)stemp2);
+        stemp1[len1] = '\0';
+        stemp2[len2] = '\0';
 
-        free(stemp1);
-        free(stemp2);
+		string str1(stemp1);
+		string str2(stemp2);
 
-        //printf("str1: %s", str1.c_str());
-        //printf("str2: %s", str2.c_str());
 
-		int res = str1.compare(str2);
+        //free(stemp1);
+        //free(stemp2);
+
+        int res = str1.compare(str2);
+
+        printf("compare(%s and %s) = %d\n", str1.c_str(), str2.c_str(), res);
+
+
 		switch (op) {
 			case EQ_OP: return res == 0;
         	case LT_OP: return res < 0;

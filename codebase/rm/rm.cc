@@ -385,8 +385,6 @@ RC RelationManager::createTable(const string &tableName, const vector<Attribute>
         }
     }
 
-    //printf("############## recordDescriptor of %s is inserted to Columns\n", tableName.c_str());
-
     free(data);
     return 0;
 }
@@ -400,8 +398,6 @@ RC RelationManager::deleteTable(const string &tableName) {
         return -1;
     }
 
-    //printf("table file of %s is deleted, now deleting <id, tableName, fileName> from Tables\n", tableName.c_str());
-
     int tableId;
     RID rid;
     
@@ -410,9 +406,6 @@ RC RelationManager::deleteTable(const string &tableName) {
     FileHandle tableFileHandle;
     rbfm->openFile(TABLES_TABLE_NAME, tableFileHandle);
 
-
-    //printf("Before delete in Tables\n");
-    //rbfm->printTable(tableFileHandle, tableRecordDescriptor);
 
     if (rbfm->deleteRecord(tableFileHandle, tableRecordDescriptor, rid) < 0) {
         rbfm->closeFile(tableFileHandle);
@@ -439,12 +432,6 @@ RC RelationManager::deleteTable(const string &tableName) {
     //search in "Columns" to find the tuples where table-id = tableId
     scan(COLUMNS_TABLE_NAME, "table-id", EQ_OP, &tableId, attributeNames, rm_ScanIterator);
 
-    //printf("rm::scan(Columns, table-id, EQ_OP, &tableId, attributeNames, rm_ScanIterator) done\n");
-
-
-    //printf("Before delete in Columns\n");
-    //rbfm->printTable(rm_ScanIterator.rbfm_ScanIterator.fileHandle, columnRecordDescriptor);
-
 
     while (rm_ScanIterator.getNextTuple(rid, targetTuple) != -1) {
         if (rbfm->deleteRecord(rm_ScanIterator.rbfm_ScanIterator.fileHandle, columnRecordDescriptor, rid) < 0) {
@@ -454,10 +441,6 @@ RC RelationManager::deleteTable(const string &tableName) {
             return -1;
         }
     }
-
-    //printf("After delete in Columns\n");
-    //rbfm->printTable(rm_ScanIterator.rbfm_ScanIterator.fileHandle, columnRecordDescriptor);
-
 
     // search in "Indices" to find the tuples where table-id = tableId
     scan(INDICES_TABLE_NAME, "table-id", EQ_OP, &tableId, attributeIndexNames, rm_ScanIterator);
