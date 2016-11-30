@@ -58,7 +58,7 @@ public:
 // RM_IndexScanIterator is an iterator to go through index entries
 class RM_IndexScanIterator {
 public:
-    RM_IndexScanIterator();  	// Constructor
+    RM_IndexScanIterator() {};  	// Constructor
     ~RM_IndexScanIterator() {}; 	// Destructor
 
     IX_ScanIterator ix_ScanIterator;

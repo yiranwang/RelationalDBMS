@@ -16,9 +16,6 @@ bool fexists(const string& fileName) {
     return access(fileName.c_str(), F_OK ) != -1;
 }
 
-RM_IndexScanIterator::RM_IndexScanIterator(){
-
-}
 
 RelationManager* RelationManager::_rm = 0;
 
