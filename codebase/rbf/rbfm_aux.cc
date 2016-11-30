@@ -216,7 +216,7 @@ RC RecordBasedFileManager::composeInnerRecord(const vector<Attribute> &recordDes
     int bitPos = 7;
     for (int fieldIndex = 0; fieldIndex < fieldCount; fieldIndex++) {
             int nullByteNum = fieldIndex / 8;
-            int bitMask = 1 << bitPos;            
+            int bitMask = 1 << bitPos;
             // shift bit position to the right by 1 for next iteration
             bitPos--;
             bitPos = (CHAR_BIT + bitPos) % CHAR_BIT;
