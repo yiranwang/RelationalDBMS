@@ -385,6 +385,41 @@ RC RecordBasedFileManager::updateRecord(FileHandle &fileHandle, const vector<Att
     return 0;
 }
 
+RC RecordBasedFileManager::readAttribute(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, const string &attributeName, void *data) {
+
+    // find out target attribute index
+    int targetAttrIndex = 0;
+    for (; targetAttrIndex < recordDescriptor.size(); targetAttrIndex++) {
+        if (recordDescriptor[targetAttrIndex].name.compare(attributeName) == 0) {
+            break;
+        }
+    }
+    if (targetAttrIndex == recordDescriptor.size()) {
+        if(DEBUG) printf("conditionAttribute not found!\n");
+        return -1;
+    }
+
+
+    // read out the inner record
+    void *targetInnerRecord = malloc(PAGE_SIZE);
+    if(readInnerRecord(fileHandle, recordDescriptor, rid, targetInnerRecord) < 0) {
+        if(DEBUG) printf("Error in readInnerRecord\n");
+        free(targetInnerRecord);
+        closeFile(fileHandle);
+        return -1;
+    }
+
+    // read out the attribute from the target inner record given the attrIndex
+    readAttributeFromInnerRecord(recordDescriptor, targetInnerRecord, targetAttrIndex, data);
+
+    free(targetInnerRecord);
+    /*if (closeFile(fileHandle) < 0) {
+        return -1;
+    }*/
+
+    return 0;
+}
+
 
 
 

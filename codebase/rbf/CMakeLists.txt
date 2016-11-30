@@ -9,6 +9,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
 
 file(GLOB RBF_SOURCES "*.cc")
 
+
 add_library(rbf ${RBF_SOURCES})
 
 

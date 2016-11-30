@@ -332,9 +332,15 @@ void RecordBasedFileManager::readAttributeFromInnerRecord(const vector<Attribute
     }
     else if (recordDescriptor[targetAttrIndex].type == TypeVarChar) {
         int varCharLen = *(int*)((char*)innerRecord + attrOffset);
-        memcpy((char*)data + 1, (char*)innerRecord + attrOffset + sizeof(int), varCharLen);
-        ((char*)data)[varCharLen + 1] = '\0';
-        //printf("Read off %s = %s\n", recordDescriptor[targetAttrIndex].name.c_str(), ((char*)data + 1));
+        memcpy((char*)data + 1, (char*)innerRecord + attrOffset, varCharLen  + sizeof(int));
+
+        //((char*)data)[varCharLen + 1] = '\0';
+        void *test = malloc(varCharLen + 1);
+        memcpy((char*)test, (char*)data + 1, varCharLen);
+        ((char*)test)[varCharLen] = '\0';
+        string sss((char*)test);
+        //printf("Read off %s = %s\n", recordDescriptor[targetAttrIndex].name.c_str(), (char*)test);
+        free(test);
     } 
     else if (recordDescriptor[targetAttrIndex].type == TypeInt) {
         memcpy((char*)data + 1, (char*)innerRecord + attrOffset, sizeof(int));

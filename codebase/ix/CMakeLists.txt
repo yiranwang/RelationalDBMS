@@ -10,9 +10,7 @@ file(GLOB IX_SOURCES "*.cc")
 add_library(ix ${IX_SOURCES})
 
 
-
-#[[
-add_executable(ixtest_01 ixtest_01.cc)
+#[[add_executable(ixtest_01 ixtest_01.cc)
 target_link_libraries(ixtest_01 ix rbf rm)
 
 add_executable(ixtest_02 ixtest_02.cc)
@@ -66,6 +64,4 @@ add_executable(ixtest_extra_02 ixtest_extra_02.cc)
 target_link_libraries(ixtest_extra_02 ix rbf rm)
 
 add_executable(ixtest_extra_01 ixtest_extra_01.cc)
-target_link_libraries(ixtest_extra_01 ix rbf rm)
-
-]]
+target_link_libraries(ixtest_extra_01 ix rbf rm)]]

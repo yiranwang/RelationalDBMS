@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "../rbf/rbfm.h"
+#include "../ix/ix.h"
 
 using namespace std;
 
@@ -15,6 +16,8 @@ static const char TABLES_TABLE_NAME[]  = "Tables";
 static const char TABLES_FILE_NAME[]   = "Tables";
 static const char COLUMNS_TABLE_NAME[] = "Columns";
 static const char COLUMNS_FILE_NAME[]  = "Columns";
+static const char INDICES_TABLE_NAME[] = "Indices";
+static const char INDICES_FILE_NAME[]  = "Indices";
 
 typedef struct{
     Attribute attribute;
@@ -52,6 +55,24 @@ public:
 };
 
 
+// RM_IndexScanIterator is an iterator to go through index entries
+class RM_IndexScanIterator {
+public:
+    RM_IndexScanIterator();  	// Constructor
+    ~RM_IndexScanIterator() {}; 	// Destructor
+
+    IX_ScanIterator ix_ScanIterator;
+
+    // "key" follows the same format as in IndexManager::insertEntry()
+    RC getNextEntry(RID &rid, void *key) {
+        return ix_ScanIterator.getNextEntry(rid, key);
+    };  	// Get next matching entry
+    RC close() {
+        return ix_ScanIterator.close();
+    };             			// Terminate index scan
+};
+
+
 // Relation Manager
 class RelationManager
 {
@@ -60,9 +81,13 @@ public:
 
     RecordBasedFileManager *rbfm;
 
+    IndexManager *ixm;
+
     vector<Attribute> tableRecordDescriptor;
 
     vector<Attribute> columnRecordDescriptor;
+
+    vector<Attribute> indicesRecordDescriptor;
 
     // the latest table id (or largest, since it's increasing monotonically)
     int lastTableId;
@@ -109,6 +134,27 @@ public:
         const vector<string> &attributeNames, // a list of projected attributes
         RM_ScanIterator &rm_ScanIterator);
 
+
+
+    RC createIndex(const string &tableName, const string &attributeName);
+
+    RC destroyIndex(const string &tableName, const string &attributeName);
+
+    // indexScan returns an iterator to allow the caller to go through qualified entries in index
+    RC indexScan(const string &tableName,
+                 const string &attributeName,
+                 const void *lowKey,
+                 const void *highKey,
+                 bool lowKeyInclusive,
+                 bool highKeyInclusive,
+                 RM_IndexScanIterator &rm_IndexScanIterator);
+
+    void insertIndexWithInsertTuple(FileHandle &fileHandle, const string &tableName,
+                                  vector<Attribute> &recordDescriptor, const RID &rid);
+
+    void deleteIndexWithDeleteTuple(FileHandle &fileHandle, const string &tableName,
+                                  vector<Attribute> &recordDescriptor, const RID &rid);
+
 // Extra credit work (10 points)
 public:
     RC addAttribute(const string &tableName, const Attribute &attr);
@@ -125,6 +171,8 @@ private:
   void createTableRecordDescriptor(vector<Attribute> &recordDescriptor);
 
   void createColumnRecordDescriptor(vector<Attribute> &recordDescriptor);
+
+  void createIndicesRecordDescriptor(vector<Attribute> &recordDescriptor);
 };
 
 #endif

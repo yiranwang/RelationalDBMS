@@ -45,9 +45,9 @@ RC RecordBasedFileManager::scan(FileHandle &fileHandle,
 		// build a string in case of TypeVarChar
 		if (fieldAttr.type == TypeVarChar) {
 			dataLength = *(int*)value;
-			rbfm_ScanIterator.value = malloc(dataLength + 1);
-			memcpy(rbfm_ScanIterator.value, (char*)value + sizeof(int), dataLength);
-			*((char*)(rbfm_ScanIterator.value) + dataLength)= '\0';
+			rbfm_ScanIterator.value = malloc(dataLength + sizeof(int));
+			memcpy(rbfm_ScanIterator.value, (char*)value, dataLength  + sizeof(int));
+			//*((char*)(rbfm_ScanIterator.value) + dataLength)= '\0';
 		}
 		else {
 			rbfm_ScanIterator.value = malloc(dataLength);
@@ -235,8 +235,27 @@ bool RBFM_ScanIterator::opCompare(void* ref1, void* ref2, CompOp op, AttrType ty
     }
     if (type == TypeVarChar) {
     	//printf("comparing %s and %s\n", (char*)ref1, (char*)ref2);
-		string str1((char*)ref1);
-		string str2((char*)ref2);
+		int len1 = *(int*)((char*)ref1);
+        int len2 = *(int*)((char*)ref2);
+
+        void *stemp1 = malloc(len1 + 1);
+        void *stemp2 = malloc(len2 + 1);
+
+        memcpy(stemp1, (char*)ref1 + sizeof(int), len1);
+        memcpy(stemp2, (char*)ref2 + sizeof(int), len2);
+
+        ((char*)stemp1)[len1] = '\0';
+        ((char*)stemp2)[len2] = '\0';
+
+		string str1((char*)stemp1);
+		string str2((char*)stemp2);
+
+        free(stemp1);
+        free(stemp2);
+
+        //printf("str1: %s", str1.c_str());
+        //printf("str2: %s", str2.c_str());
+
 		int res = str1.compare(str2);
 		switch (op) {
 			case EQ_OP: return res == 0;

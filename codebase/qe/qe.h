@@ -6,6 +6,11 @@
 #include "../rbf/rbfm.h"
 #include "../rm/rm.h"
 #include "../ix/ix.h"
+#include <map>
+#include <sstream>
+#include <string>
+#include <cmath>
+#include <queue>
 
 #define QE_EOF (-1)  // end of the index scan
 
@@ -144,6 +149,13 @@ class IndexScan : public Iterator
             if(alias) this->tableName = alias;
         };
 
+        void reset(){
+            iter->close();
+            delete iter;
+            iter = new RM_IndexScanIterator();
+            rm.indexScan(tableName, attrName, NULL, NULL, true, true, *iter);
+        }
+
         // Start a new iterator given the new key range
         void setIterator(void* lowKey,
                          void* highKey,
@@ -192,59 +204,82 @@ class IndexScan : public Iterator
 
 class Filter : public Iterator {
     // Filter operator
-    public:
-        Filter(Iterator *input,               // Iterator of input R
-               const Condition &condition     // Selection condition
-        );
-        ~Filter(){};
+public:
+    Iterator *input;
+    Condition condition;
 
-        RC getNextTuple(void *data) {return QE_EOF;};
-        // For attribute in vector<Attribute>, name it as rel.attr
-        void getAttributes(vector<Attribute> &attrs) const{};
+    RecordBasedFileManager *rbfm;
+
+    Filter(Iterator *input,               // Iterator of input R
+           const Condition &condition     // Selection condition
+    );
+    ~Filter(){};
+
+    RC getNextTuple(void *data);
+    // For attribute in vector<Attribute>, name it as rel.attr
+    void getAttributes(vector<Attribute> &attrs) const;
 };
 
 
 class Project : public Iterator {
     // Projection operator
     public:
+
+        Iterator *input;
+        vector<string> projectAttrs;
+
+        RecordBasedFileManager *rbfm;
+
         Project(Iterator *input,                    // Iterator of input R
-              const vector<string> &attrNames){};   // vector containing attribute names
+              const vector<string> &attrNames);   // vector containing attribute names
         ~Project(){};
 
-        RC getNextTuple(void *data) {return QE_EOF;};
+        RC getNextTuple(void *data);
         // For attribute in vector<Attribute>, name it as rel.attr
-        void getAttributes(vector<Attribute> &attrs) const{};
+        void getAttributes(vector<Attribute> &attrs) const;
 };
 
 class BNLJoin : public Iterator {
     // Block nested-loop join operator
     public:
+        Iterator *leftIn;
+        TableScan *rightIn;
+        Condition condition;
+        unsigned memoryLimit;
+        unsigned curMemoryUsage;
+        multimap<string, void*> inmemoryMap;
+        void *next;
+
         BNLJoin(Iterator *leftIn,            // Iterator of input R
                TableScan *rightIn,           // TableScan Iterator of input S
                const Condition &condition,   // Join condition
                const unsigned numPages       // # of pages that can be loaded into memory,
 			                                 //   i.e., memory block size (decided by the optimizer)
-        ){};
+        );
         ~BNLJoin(){};
 
-        RC getNextTuple(void *data){return QE_EOF;};
+        RC getNextTuple(void *data);
         // For attribute in vector<Attribute>, name it as rel.attr
-        void getAttributes(vector<Attribute> &attrs) const{};
+        void getAttributes(vector<Attribute> &attrs) const;
 };
 
 
 class INLJoin : public Iterator {
     // Index nested-loop join operator
     public:
+        Iterator *leftIn;
+        IndexScan *rightIn;
+        Condition condition;
+
         INLJoin(Iterator *leftIn,           // Iterator of input R
                IndexScan *rightIn,          // IndexScan Iterator of input S
                const Condition &condition   // Join condition
-        ){};
+        );
         ~INLJoin(){};
 
-        RC getNextTuple(void *data){return QE_EOF;};
+        RC getNextTuple(void *data);
         // For attribute in vector<Attribute>, name it as rel.attr
-        void getAttributes(vector<Attribute> &attrs) const{};
+        void getAttributes(vector<Attribute> &attrs) const;
 };
 
 // Optional for everyone. 10 extra-credit points
@@ -265,13 +300,23 @@ class GHJoin : public Iterator {
 
 class Aggregate : public Iterator {
     // Aggregation operator
+    private:
+        queue<void*> resultQueue;
+
     public:
         // Mandatory
         // Basic aggregation
+        Iterator *input;
+        bool groupby;
+        Attribute aggAttr;
+        AggregateOp op;
+        Attribute groupAttr;
+        int resultSize;
+
         Aggregate(Iterator *input,          // Iterator of input R
                   Attribute aggAttr,        // The attribute over which we are computing an aggregate
                   AggregateOp op            // Aggregate operation
-        ){};
+        );
 
         // Optional for everyone: 5 extra-credit points
         // Group-based hash aggregation
@@ -279,14 +324,16 @@ class Aggregate : public Iterator {
                   Attribute aggAttr,           // The attribute over which we are computing an aggregate
                   Attribute groupAttr,         // The attribute over which we are grouping the tuples
                   AggregateOp op              // Aggregate operation
-        ){};
+        );
         ~Aggregate(){};
 
-        RC getNextTuple(void *data){return QE_EOF;};
+        void groupByAggregate();
+
+        RC getNextTuple(void *data);
         // Please name the output attribute as aggregateOp(aggAttr)
         // E.g. Relation=rel, attribute=attr, aggregateOp=MAX
         // output attrname = "MAX(rel.attr)"
-        void getAttributes(vector<Attribute> &attrs) const{};
+        void getAttributes(vector<Attribute> &attrs) const;
 };
 
 #endif

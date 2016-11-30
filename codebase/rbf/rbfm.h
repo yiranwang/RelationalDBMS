@@ -141,6 +141,7 @@ RC deleteRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescripto
 // Assume the RID does not change after an update
 RC updateRecord(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const void *data, const RID &rid);
 
+RC readAttribute(FileHandle &fileHandle, const vector<Attribute> &recordDescriptor, const RID &rid, const string &attributeName, void *data);
 
 void readAttributeFromInnerRecord(const vector<Attribute> &recordDescriptor, void *innerRecord, const int conditionAttrIndex, void *data);
 

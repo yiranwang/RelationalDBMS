@@ -8,10 +8,16 @@
 #include <unistd.h>
 #include <iostream>
 #include <algorithm>
+#include <assert.h>
+
 
 bool fexists(const string& fileName) {
     //printf("Checking if file %s exists...\n", fileName.c_str());
     return access(fileName.c_str(), F_OK ) != -1;
+}
+
+RM_IndexScanIterator::RM_IndexScanIterator(){
+
 }
 
 RelationManager* RelationManager::_rm = 0;
@@ -24,6 +30,8 @@ RelationManager* RelationManager::instance(){
 
 RelationManager::RelationManager() {
 	rbfm = RecordBasedFileManager::instance();
+
+    ixm = IndexManager::instance();
 
 	createTableRecordDescriptor(tableRecordDescriptor);
 
@@ -163,6 +171,14 @@ RC RelationManager::createCatalog() {
         return -1;
     }
 
+    memset(tmpData, 0, PAGE_SIZE);
+    prepareApiTableRecord(3, INDICES_TABLE_NAME, INDICES_FILE_NAME, tmpData, apiTableRecordSize);
+    if (rbfm->insertRecord(tableFileHandle, tableRecordDescriptor, tmpData, dummyRid) < 0) {
+        free(tmpData);
+        rbfm->closeFile(tableFileHandle);
+        return -1;
+    }
+
     if (rbfm->closeFile(tableFileHandle) < 0) {
         free(tmpData);
         return -1;
@@ -254,15 +270,65 @@ RC RelationManager::createCatalog() {
         return -1;
     }
 
+
+    // ============== write Indices record descriptor
+
+
+    memset(tmpData, 0, PAGE_SIZE);
+    prepareApiColumnRecord(3, "table-id", TypeInt, 4, 1, tmpData);
+    if (rbfm->insertRecord(columnFileHandle, columnRecordDescriptor, tmpData, dummyRid) < 0) {
+        free(tmpData);
+        rbfm->closeFile(columnFileHandle);
+        return -1;
+    }
+
+    memset(tmpData, 0, PAGE_SIZE);
+    prepareApiColumnRecord(3, "index-name", TypeVarChar, 50, 2, tmpData);
+    if (rbfm->insertRecord(columnFileHandle, columnRecordDescriptor, tmpData, dummyRid) < 0) {
+        free(tmpData);
+        rbfm->closeFile(columnFileHandle);
+        return -1;
+    }
+
+    memset(tmpData, 0, PAGE_SIZE);
+    prepareApiColumnRecord(3, "index-type", TypeInt, 4, 3, tmpData);
+    if (rbfm->insertRecord(columnFileHandle, columnRecordDescriptor, tmpData, dummyRid) < 0) {
+        free(tmpData);
+        rbfm->closeFile(columnFileHandle);
+        return -1;
+    }
+
+    memset(tmpData, 0, PAGE_SIZE);
+    prepareApiColumnRecord(3, "index-length", TypeInt, 4, 4, tmpData);
+    if (rbfm->insertRecord(columnFileHandle, columnRecordDescriptor, tmpData, dummyRid) < 0) {
+        free(tmpData);
+        rbfm->closeFile(columnFileHandle);
+        return -1;
+    }
+
+    memset(tmpData, 0, PAGE_SIZE);
+    prepareApiColumnRecord(3, "index-position", TypeInt, 4, 5, tmpData);
+    if (rbfm->insertRecord(columnFileHandle, columnRecordDescriptor, tmpData, dummyRid) < 0) {
+        free(tmpData);
+        rbfm->closeFile(columnFileHandle);
+        return -1;
+    }
+
+
     if (rbfm->closeFile(columnFileHandle) < 0) {
         free(tmpData);
         return -1;
     }
 
     // ==============   finished Columns ================
+
+    if (rbfm->createFile(INDICES_FILE_NAME) < 0) {
+        free(tmpData);
+        return -1;
+    }
     
     free(tmpData);
-    lastTableId = 2;
+    lastTableId = 3;
 
     return 0;
 }
@@ -272,6 +338,10 @@ RC RelationManager::deleteCatalog() {
         return -1;
     }       
     if(rbfm->destroyFile(COLUMNS_FILE_NAME) < 0) {
+        return -1;
+    }
+
+    if(rbfm->destroyFile(INDICES_FILE_NAME) < 0) {
         return -1;
     }
     return 0;
@@ -365,6 +435,9 @@ RC RelationManager::deleteTable(const string &tableName) {
     RM_ScanIterator rm_ScanIterator;
     void *targetTuple = malloc(PAGE_SIZE);
 
+    vector<string> attributeIndexNames;
+    attributeNames.push_back("index-name");
+
 
     //search in "Columns" to find the tuples where table-id = tableId
     scan(COLUMNS_TABLE_NAME, "table-id", EQ_OP, &tableId, attributeNames, rm_ScanIterator);
@@ -388,6 +461,29 @@ RC RelationManager::deleteTable(const string &tableName) {
     //printf("After delete in Columns\n");
     //rbfm->printTable(rm_ScanIterator.rbfm_ScanIterator.fileHandle, columnRecordDescriptor);
 
+
+    // search in "Indices" to find the tuples where table-id = tableId
+    scan(INDICES_TABLE_NAME, "table-id", EQ_OP, &tableId, attributeIndexNames, rm_ScanIterator);
+
+    while (rm_ScanIterator.getNextTuple(rid, targetTuple) != -1) {
+        if (rbfm->deleteRecord(rm_ScanIterator.rbfm_ScanIterator.fileHandle, columnRecordDescriptor, rid) < 0) {
+            if (DEBUG) printf("Error in delete, rmsi closed\n");
+            rm_ScanIterator.close();
+            free(targetTuple);
+            return -1;
+        }
+
+        // for every index, delete from catalog, get it's attribute name, destroy index
+        int lengthOfIndexName = *(int*)((char*)targetTuple + 1);
+        char* indexName = (char*)malloc(lengthOfIndexName);
+        indexName[lengthOfIndexName] ='\0';
+
+        memcpy(indexName, (char*)targetTuple + 1 + sizeof(int), lengthOfIndexName);
+        string indexNameStr(indexName);
+        destroyIndex(tableName, indexNameStr);
+    }
+
+    rbfm->destroyFile(tableName);
 
     rm_ScanIterator.close();
     free(targetTuple);
@@ -509,12 +605,19 @@ RC RelationManager::insertTuple(const string &tableName, const void *data, RID &
         return -1;
     }
 
-    //printf("tuple is inserted into %s at RID(%d, %d):\n", tableName.c_str(), rid.pageNum, rid.slotNum);
-    //printTuple(recordDescriptor, data);
+    //insert index
+    if (tableName!="Tables"&&tableName!="Columns"&&tableName!="Indices") {
+        insertIndexWithInsertTuple(fileHandle, tableName, recordDescriptor, rid);
+    }
+
 
     if (rbfm->closeFile(fileHandle) < 0) {
         return -1;
     }
+
+    //printf("tuple is inserted into %s at RID(%d, %d):\n", tableName.c_str(), rid.pageNum, rid.slotNum);
+    //printTuple(recordDescriptor, data);
+
 
     return 0;
 }
@@ -525,7 +628,6 @@ RC RelationManager::deleteTuple(const string &tableName, const RID &rid) {
 
     getAttributes(tableName, recordDescriptor);
 
-
     if (rbfm->openFile(tableName, fileHandle) < 0) {
         return -1;
     }
@@ -534,6 +636,9 @@ RC RelationManager::deleteTuple(const string &tableName, const RID &rid) {
         rbfm->closeFile(fileHandle);
         return -1;
     }
+
+    // delete index accordingly
+    deleteIndexWithDeleteTuple(fileHandle, tableName, recordDescriptor, rid);
 
     if (rbfm->closeFile(fileHandle) < 0) {
         return -1;
@@ -557,9 +662,16 @@ RC RelationManager::updateTuple(const string &tableName, const void *data, const
         return -1;
     }
 
+    //first delete index
+    deleteIndexWithDeleteTuple(fileHandle, tableName, recordDescriptor, rid);
+
+    //then insert index
+    insertIndexWithInsertTuple(fileHandle, tableName, recordDescriptor, rid);
+
     if (rbfm->closeFile(fileHandle) < 0) {
         return -1;
     }
+
 
     return 0;
 }
@@ -768,6 +880,273 @@ void RelationManager::createColumnRecordDescriptor(vector<Attribute> &recordDesc
     attr5.type = TypeInt;
     attr5.length = (AttrLength)4;
     recordDescriptor.push_back(attr5);
+}
+
+void RelationManager::createIndicesRecordDescriptor(vector<Attribute> &recordDescriptor) {
+    Attribute attr1;
+    attr1.name = "table-id";
+    attr1.type = TypeInt;
+    attr1.length = (AttrLength)4;
+    recordDescriptor.push_back(attr1);
+
+    Attribute attr2;
+    attr2.name = "index-name";
+    attr2.type = TypeVarChar;
+    attr2.length = (AttrLength)50;
+    recordDescriptor.push_back(attr2);
+
+    Attribute attr3;
+    attr3.name = "index-type";
+    attr3.type = TypeInt;
+    attr3.length = (AttrLength)4;
+    recordDescriptor.push_back(attr3);
+
+    Attribute attr4;
+    attr4.name = "index-length";
+    attr4.type = TypeInt;
+    attr4.length = (AttrLength)4;
+    recordDescriptor.push_back(attr4);
+
+    Attribute attr5;
+    attr5.name = "index-position";
+    attr5.type = TypeInt;
+    attr5.length = (AttrLength)4;
+    recordDescriptor.push_back(attr5);
+}
+
+
+//----------------------------------------------------------------------------------------------------
+
+
+RC RelationManager::createIndex(const string &tableName, const string &attributeName)
+{
+    string ixname = tableName + "->" + attributeName;
+
+    if (fexists(ixname)) {
+        return -1;
+    }
+
+    void *data = malloc(PAGE_SIZE);
+
+    int tableId;
+    RID rid;
+    getTableIdByTableName(tableId, rid, tableName);
+
+    RM_ScanIterator rm_scanIterator;
+    vector<string> attriname;
+    attriname.push_back(attributeName);
+
+    vector<Attribute> recordDescriptor;
+    getAttributes(tableName, recordDescriptor);
+    Attribute attribute;
+    for(int i = 0; i < recordDescriptor.size(); i++){
+        if(recordDescriptor[i].name == attributeName){
+            attribute = recordDescriptor[i];
+        }
+    }
+
+    prepareApiColumnRecord(tableId, attribute.name, attribute.type, attribute.length, 0, data);
+    insertTuple(INDICES_TABLE_NAME, data, rid);
+
+    free(data);
+
+    ixm->createFile(ixname);
+    IXFileHandle ixFileHandle;
+    ixm->openFile(ixname, ixFileHandle);
+
+    void *key = malloc(PAGE_SIZE);
+
+    this->scan(tableName, "", NO_OP, NULL, attriname, rm_scanIterator);
+    while(rm_scanIterator.getNextTuple(rid, key) != EOF){
+        assert(!(*(char*)key & (1 << 7))); // there is no NULL key
+        ixm->insertEntry(ixFileHandle, attribute, (char*)key + 1, rid);
+    }
+    rm_scanIterator.close();
+    ixm->closeFile(ixFileHandle);
+    free(key);
+
+    return 0;
+}
+
+RC RelationManager::destroyIndex(const string &tableName, const string &attributeName)
+{
+    string ixname = tableName + "->" + attributeName;
+
+    if (tableName == "Tables" || tableName == "Columns" || !fexists(ixname)) {
+        return -1;
+    }
+
+    vector<string> attributes;
+    string tableIdSingle="table-id";
+    attributes.push_back(tableIdSingle);
+
+    int ixnameLength = strlen(ixname.c_str());
+    void *ixnameInnerFormat = malloc(ixnameLength + sizeof(int));
+    *(int*)((char*)ixnameInnerFormat) = ixnameLength;
+    memcpy((char*)ixnameInnerFormat + sizeof(int), ixname.c_str(), ixnameLength);
+
+    RM_ScanIterator rm_ScanIterator;
+    this->scan(INDICES_TABLE_NAME, "index-name", EQ_OP, ixnameInnerFormat, attributes, rm_ScanIterator);
+
+    free(ixnameInnerFormat);
+
+    RID rid;
+    void *tupleWithTableId = malloc(PAGE_SIZE);
+    rm_ScanIterator.getNextTuple(rid, tupleWithTableId);
+    rm_ScanIterator.close();
+
+    deleteTuple(INDICES_TABLE_NAME, rid);
+
+    free(tupleWithTableId);
+    rm_ScanIterator.close();
+    rbfm->destroyFile(ixname);
+    return 0;
+
+
+}
+
+RC RelationManager::indexScan(const string &tableName,
+                              const string &attributeName,
+                              const void *lowKey,
+                              const void *highKey,
+                              bool lowKeyInclusive,
+                              bool highKeyInclusive,
+                              RM_IndexScanIterator &rm_IndexScanIterator)
+{
+    string ixname = tableName + "->" + attributeName;
+
+    //IndexManager *ixm = IndexManager::instance();
+
+    IXFileHandle ixFileHandle;
+
+    int rc = ixm->openFile(ixname, ixFileHandle);
+    if(rc != 0){
+        return -1;
+    }
+
+    vector<Attribute> recordDescriptor;
+    this->getAttributes(tableName, recordDescriptor);
+    Attribute attribute;
+    for (int i = 0; i< recordDescriptor.size(); i++){
+        if(strcmp(recordDescriptor[i].name.c_str(), attributeName.c_str()) == 0){
+            attribute = recordDescriptor[i];
+            break;
+        }
+    }
+
+    return ixm->scan(ixFileHandle, attribute, lowKey, highKey, lowKeyInclusive, highKeyInclusive, rm_IndexScanIterator.ix_ScanIterator);
+}
+
+
+void RelationManager::insertIndexWithInsertTuple(FileHandle &fileHandle, const string &tableName,
+                                               vector<Attribute> &recordDescriptor, const RID &rid) {
+
+    int tableId;
+    RID ridTemp;
+    getTableIdByTableName(tableId, ridTemp, tableName);
+
+    IXFileHandle ixFileHandle;
+    RM_ScanIterator rm_ScanIterator;
+    RID ridIndex;
+
+    vector<string> attributeIndexName;
+    string indexName = "index-name";
+    attributeIndexName.push_back(indexName);
+    void *tupleIndex = malloc(PAGE_SIZE);
+
+    scan(INDICES_TABLE_NAME, "table-id", EQ_OP, &tableId, attributeIndexName, rm_ScanIterator);
+
+    while (rm_ScanIterator.getNextTuple(ridIndex, tupleIndex)!=-1) {
+        // for every index ,get it's attri name, then get file name
+
+        int lengthOfIndexName = *(int*)((char*)tupleIndex + 1);
+        char* indexName = (char*)malloc(lengthOfIndexName + 1);
+        indexName[lengthOfIndexName] = '\0';
+
+        memcpy(indexName, (char*)tupleIndex + 1 + sizeof(int), lengthOfIndexName);
+        string indexNameStr(indexName);
+        string fileName;
+        fileName = tableName + "->" + indexNameStr;
+
+
+        ixm->openFile(fileName, ixFileHandle);
+
+        Attribute attribute;
+        for(int i = 0; i < recordDescriptor.size(); i++){
+            if(strcmp(recordDescriptor[i].name.c_str(), indexNameStr.c_str()) == 0){
+                attribute = recordDescriptor[i];
+            }
+        }
+
+        void *key = malloc(PAGE_SIZE);
+        //rbfm->openFile(tableName, fileHandle);
+        rbfm->readAttribute(fileHandle, recordDescriptor, rid, indexNameStr, key);
+        //rbfm->closeFile(fileHandle);
+
+        ixm->insertEntry(ixFileHandle, attribute, (char*)key + 1, rid);
+        free(key);
+        free(indexName);
+        ixm->closeFile(ixFileHandle);
+
+    }
+
+    rm_ScanIterator.close();
+    free(tupleIndex);
+}
+
+void RelationManager::deleteIndexWithDeleteTuple(FileHandle &fileHandle, const string &tableName,
+                                               vector<Attribute> &recordDescriptor, const RID &rid) {
+
+    int tableId;
+    RID ridTemp;
+    getTableIdByTableName(tableId, ridTemp, tableName);
+
+    IXFileHandle ixFileHandle;
+    RM_ScanIterator rm_ScanIterator;
+    RID ridIndex;
+
+    vector<string> attributeIndexName;
+    string indexName = "index-name";
+    attributeIndexName.push_back(indexName);
+    void *tupleIndex = malloc(PAGE_SIZE);
+
+    scan("Indices", "table-id", EQ_OP, &tableId, attributeIndexName, rm_ScanIterator);
+
+    while (rm_ScanIterator.getNextTuple(ridIndex, tupleIndex) != -1) {
+        // for every index ,get it's attri name, then get file name
+
+        int lengthOfIndexName = *(int*)((char*)tupleIndex + 1);
+        char* indexName = (char*)malloc(lengthOfIndexName + 1);
+        indexName[lengthOfIndexName] ='\0';
+
+        memcpy(indexName, (char*)tupleIndex + 1 + sizeof(int), lengthOfIndexName);
+        string indexNameStr(indexName);
+        string fileName;
+        fileName = tableName + "->" + indexNameStr;
+
+
+        Attribute attribute;
+        for(int i = 0; i < recordDescriptor.size(); i++){
+            if(recordDescriptor[i].name == indexNameStr){
+                attribute = recordDescriptor[i];
+            }
+        }
+
+        void *key = malloc(PAGE_SIZE);
+        //rbfm->openFile(tableName, fileHandle);
+        rbfm->readAttribute(fileHandle, recordDescriptor, rid, indexNameStr, key);
+        //rbfm->closeFile(fileHandle);
+
+        ixm->openFile(fileName, ixFileHandle);
+        ixm->deleteEntry(ixFileHandle, attribute, (char*)key + 1, rid);
+        free(key);
+        free(indexName);
+        ixm->closeFile(ixFileHandle);
+
+    }
+
+    rm_ScanIterator.close();
+    free(tupleIndex);
 }
 
 
