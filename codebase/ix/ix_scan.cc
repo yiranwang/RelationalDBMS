@@ -70,7 +70,7 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key) {
     // if highkey == NULL, scan all the records after low key
     // otherwise check ending condition
     if (highKey != NULL) {
-        if (attrType == TypeInt) {
+        /*if (attrType == TypeInt) {
             int entryVal = *(int*)entryPtr;
             int highKeyVal = *(int*)highKey;
             printf("\nentryPtr val is: %d. ", entryVal);
@@ -80,7 +80,7 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key) {
             float highKeyVal = *(float*)highKey;
             printf("\nentryPtr val is: %f. ", entryVal);
             printf("highKey val is: %f\n", highKeyVal);
-        }
+        }*/
 
 
         int cmpResult = ixm->compareKey(entryPtr, highKey, attrType);

@@ -38,11 +38,11 @@ RC Filter::getNextTuple(void *data) {
     assert(targetFieldNum != -1);
 
     while (input->getNextTuple(data) != -1) {
-        printf("\n-----------Filter getNextTuple Done!----------------------\n");
+        /*printf("\n-----------Filter getNextTuple Done!----------------------\n");
 
         printf("Filter data:  ");
         printAPIRecord(attrs, data);
-        printf("\n");
+        printf("\n");*/
 
         bool find = false;
 
@@ -94,7 +94,7 @@ RC Filter::getNextTuple(void *data) {
     }
 
     free(innerRecordFormat);
-    printf("\n-----------Filter getNextTuple before return 0!----------------------\n");
+    //printf("\n-----------Filter getNextTuple before return 0!----------------------\n");
     return 0;
 }
 
@@ -106,7 +106,7 @@ Project::Project(Iterator *input, const vector<string> &attrNames){
 
 RC Project::getNextTuple(void *data) {
     int rc = input->getNextTuple(data);
-    printf("\n-----------Project getNextTuple Done!----------------------\n");
+    //printf("\n-----------Project getNextTuple Done!----------------------\n");
     if(rc != 0) {
         return rc;
     }
@@ -179,7 +179,7 @@ RC Project::getNextTuple(void *data) {
 
     free(projectData);
     free(innerRecordFormat);
-    printf("\n-----------Project getNextTuple before return 0!----------------------\n");
+    //printf("\n-----------Project getNextTuple before return 0!----------------------\n");
     return 0;
 
 }
@@ -535,10 +535,10 @@ RC INLJoin::getNextTuple(void *data) {
 
         int rc = leftIn->getNextTuple(leftTupleData);
 
-        printf("\n-----------INJoin getNextTuple Done!----------------------\n");
+        //printf("\n-----------INJoin getNextTuple Done!----------------------\n");
 
-        printf("leftTupleData:");
-        printAPIRecord(leftAttrs, leftTupleData);
+        //printf("leftTupleData:");
+        //printAPIRecord(leftAttrs, leftTupleData);
 
         if (rc == -1) {
             break;
@@ -573,15 +573,15 @@ RC INLJoin::getNextTuple(void *data) {
         }
     }
 
-    printf("\nrightTupleData:");
-    printAPIRecord(rightAttrs, rightTupleData);
+    //printf("\nrightTupleData:");
+    //printAPIRecord(rightAttrs, rightTupleData);
 
     if (!find) {
-        printf("--------------------------------------------------------------------");
+        /*printf("--------------------------------------------------------------------");
         printf("leftTupleData:");
         printAPIRecord(leftAttrs, leftTupleData);
         printf("\nrightTupleData:");
-        printAPIRecord(rightAttrs, rightTupleData);
+        printAPIRecord(rightAttrs, rightTupleData);*/
 
         free(leftTupleData);
         free(rightTupleData);
