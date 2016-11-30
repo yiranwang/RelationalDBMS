@@ -236,9 +236,6 @@ bool RBFM_ScanIterator::opCompare(void* ref1, void* ref2, CompOp op, AttrType ty
         //printf("str1: %s", str1.c_str());
         //printf("str2: %s\n", str2.c_str());
 
-        free(stemp1);
-        free(stemp2);
-
 		switch (op) {
 			case EQ_OP: return res == 0;
         	case LT_OP: return res < 0;
