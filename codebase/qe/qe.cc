@@ -38,6 +38,11 @@ RC Filter::getNextTuple(void *data) {
     assert(targetFieldNum != -1);
 
     while (input->getNextTuple(data) != -1) {
+        printf("\n-----------Filter getNextTuple Done!----------------------\n");
+
+        printf("Filter data:  ");
+        printAPIRecord(attrs, data);
+        printf("\n");
 
         bool find = false;
 
@@ -61,12 +66,11 @@ RC Filter::getNextTuple(void *data) {
         if (startOffset == -1) {
             find = opCompare(NULL, condition.rhsValue.data, condition.op, condition.rhsValue.type);
 
-
         }else {
             if(condition.rhsValue.type == TypeVarChar){
                 void *field = malloc(length + sizeof(int));
                 //*(int*)field = length;
-                memcpy((char*)field, (char*)innerRecordFormat + startOffset, length);
+                memcpy((char*)field, (char*)innerRecordFormat + startOffset, length + sizeof(int));
                 find = opCompare(field, condition.rhsValue.data, condition.op, condition.rhsValue.type);
                 free(field);
             }
@@ -74,6 +78,7 @@ RC Filter::getNextTuple(void *data) {
                 void *field = malloc(sizeof(int));
                 memcpy((char*)field, (char*)innerRecordFormat + startOffset, 4);
                 find = opCompare(field, condition.rhsValue.data, condition.op, condition.rhsValue.type);
+
                 free(field);
             }
         }
@@ -89,6 +94,7 @@ RC Filter::getNextTuple(void *data) {
     }
 
     free(innerRecordFormat);
+    printf("\n-----------Filter getNextTuple before return 0!----------------------\n");
     return 0;
 }
 
@@ -100,7 +106,10 @@ Project::Project(Iterator *input, const vector<string> &attrNames){
 
 RC Project::getNextTuple(void *data) {
     int rc = input->getNextTuple(data);
-    if(rc != 0) return rc;
+    printf("\n-----------Project getNextTuple Done!----------------------\n");
+    if(rc != 0) {
+        return rc;
+    }
 
     void* projectData = malloc(PAGE_SIZE);
     memset(projectData, 0, PAGE_SIZE);
@@ -170,13 +179,14 @@ RC Project::getNextTuple(void *data) {
 
     free(projectData);
     free(innerRecordFormat);
+    printf("\n-----------Project getNextTuple before return 0!----------------------\n");
     return 0;
 
 }
 
 bool findAttr(Attribute attribute, vector<string> attrs){
     for (int i = 0; i< attrs.size(); i++){
-        if(attribute.name == attrs[i]){
+        if(strcmp(attribute.name.c_str(), attrs[i].c_str()) == 0){
             return true;
         }
     }
@@ -503,41 +513,84 @@ RC INLJoin::getNextTuple(void *data) {
 
     bool find = false;
 
+    queue<void*> queue;
+
+    if (!queue.empty()) {
+        void *unionData = queue.front();
+
+        int unionDataSize = calculateBytes(attrs, unionData);
+        memcpy(data, unionData, unionDataSize);
+
+        queue.pop();
+
+        free(leftTupleData);
+        free(rightTupleData);
+
+        free(unionData);
+
+        return 0;
+    }
+
     while (1) {
+
         int rc = leftIn->getNextTuple(leftTupleData);
+
+        printf("\n-----------INJoin getNextTuple Done!----------------------\n");
+
+        printf("leftTupleData:");
+        printAPIRecord(leftAttrs, leftTupleData);
 
         if (rc == -1) {
             break;
         }
+
+
         void *leftKey = generateKey(leftTupleData, lhsAttr, leftAttrs);
 
         rightIn->setIterator(leftKey, leftKey, true, true);
 
-        rc = rightIn->getNextTuple(rightTupleData);
+        while (rightIn->getNextTuple(rightTupleData) != EOF) {
+            void *unionData = unionLeft(leftTupleData, rightTupleData, leftAttrs, rightAttrs);
+
+            if (!find) {
+                int unionDataSize = calculateBytes(attrs, unionData);
+                memcpy(data, unionData, unionDataSize);
+
+                //free(unionData);
+                find = true;
+            }else {
+                queue.push(unionData);
+            }
+
+        }
 
         if (leftKey != NULL) {
             free(leftKey);
-        }
-
-        if (rc != EOF) {
-            void *unionData = unionLeft(leftTupleData, rightTupleData, leftAttrs, rightAttrs);
-            int unionDataSize = calculateBytes(attrs, unionData);
-            memcpy(data, unionData, unionDataSize);
-
-            free(unionData);
-            find = true;
         }
 
         if (find) {
             break;
         }
     }
-    free(leftTupleData);
-    free(rightTupleData);
+
+    printf("\nrightTupleData:");
+    printAPIRecord(rightAttrs, rightTupleData);
 
     if (!find) {
+        printf("--------------------------------------------------------------------");
+        printf("leftTupleData:");
+        printAPIRecord(leftAttrs, leftTupleData);
+        printf("\nrightTupleData:");
+        printAPIRecord(rightAttrs, rightTupleData);
+
+        free(leftTupleData);
+        free(rightTupleData);
+
         return EOF;
     }
+
+    free(leftTupleData);
+    free(rightTupleData);
 
     return 0;
 

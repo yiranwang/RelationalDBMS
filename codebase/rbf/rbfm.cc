@@ -110,6 +110,8 @@ RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attri
         return -1;
     } 
     // initialize offset in record and data
+    memset(data, 0, 1);
+
     short recordOffset = sizeof(short) * (1 + fieldCount);
     int nullBytesNum = getNullIndicatorSize((int)fieldCount); 
     short dataOffset = nullBytesNum;
@@ -137,7 +139,10 @@ RC RecordBasedFileManager::readRecord(FileHandle &fileHandle, const vector<Attri
             recordOffset += sizeof(int);
         } else {
             int nullByteNum = fieldIndex / 8;
-            int bitMask = 1 << bitPos;                
+            int bitMask = 1 << bitPos;
+
+            char nullByte = ((char*)data)[nullByteNum];
+
             ((char*)data)[nullByteNum] |= bitMask;            
         }
         bitPos--;

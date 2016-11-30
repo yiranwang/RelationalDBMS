@@ -153,6 +153,7 @@ RC RecordBasedFileManager::readInnerRecord(FileHandle &fileHandle, const vector<
     Page *page = new Page;
     if (fileHandle.readPage(rid.pageNum, page) < 0) {
         //printf("Error in fileHandle.readPage\n");
+        delete(page);
         return -1;
     }
     short slotCount = page->header.slotCount;
@@ -161,6 +162,7 @@ RC RecordBasedFileManager::readInnerRecord(FileHandle &fileHandle, const vector<
     // validate slotNum
     if (rid.slotNum >= (unsigned)slotCount) {
         //printf("slot to be read does not exist!\n");
+        delete(page);
         return -1;
     }
 
@@ -172,13 +174,14 @@ RC RecordBasedFileManager::readInnerRecord(FileHandle &fileHandle, const vector<
     // case 1: the record is delete
     if (targetSlot.offset == -1) {
         //printf("Record to be read is deleted\n");
+        delete(page);
         return -1;
     }
 
     // case 2: the record is redirected to another page, trace to that page
     if (targetSlot.length == -1) {
         RID targetRid = *(RID*)((char*)page + targetSlot.offset);
-        free(page);
+        delete(page);
         return readInnerRecord(fileHandle, recordDescriptor, targetRid, data);
     }
 
@@ -186,7 +189,7 @@ RC RecordBasedFileManager::readInnerRecord(FileHandle &fileHandle, const vector<
     // case 3: the record is on this page
     // read out the target record
     readRecordFromPage(page, targetSlot.offset, targetSlot.length, data);
-    free(page);
+    delete(page);
     return 0;
 }
 
@@ -217,7 +220,11 @@ RC RecordBasedFileManager::composeInnerRecord(const vector<Attribute> &recordDes
             // shift bit position to the right by 1 for next iteration
             bitPos--;
             bitPos = (CHAR_BIT + bitPos) % CHAR_BIT;
+
+            char nullByte = ((char*)data)[nullByteNum];
+
             nullBit = ((char*)data)[nullByteNum] & bitMask;
+
             if (!nullBit) {
                 // write field offset
                 *(short*)((char*)tmpRecord + sizeof(short) * (1 + fieldIndex)) = recordOffset;

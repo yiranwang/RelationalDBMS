@@ -9,8 +9,31 @@ bool opCompare(void* ref1, void* ref2, CompOp op, AttrType type) {
     }
     if (type == TypeVarChar) {
         //printf("comparing %s and %s\n", (char*)ref1, (char*)ref2);
-        string str1((char*)ref1);
-        string str2((char*)ref2);
+        int len1 = *(int*)((char*)ref1);
+        int len2 = *(int*)((char*)ref2);
+
+        void *stemp1 = malloc(len1 + 1);
+        void *stemp2 = malloc(len2 + 1);
+
+        memcpy(stemp1, (char*)ref1 + sizeof(int), len1);
+        memcpy(stemp2, (char*)ref2 + sizeof(int), len2);
+
+        ((char*)stemp1)[len1] = '\0';
+        ((char*)stemp2)[len2] = '\0';
+
+        string str1((char*)stemp1);
+        string str2((char*)stemp2);
+
+        if (strcmp(str1.c_str(), "Msg27255") == 0) {
+
+        }
+
+        //printf("str1: %s", str1.c_str());
+        //printf("str2: %s\n", str2.c_str());
+
+        free(stemp1);
+        free(stemp2);
+
         int res = str1.compare(str2);
         switch (op) {
             case EQ_OP: return res == 0;
@@ -169,4 +192,46 @@ unsigned calculateBytes(const vector<Attribute> &recordDescriptor, const void *d
     }
 
     return offset;
+}
+
+
+void printAPIRecord(const vector<Attribute> &recordDescriptor, void *apiRecord) {
+    short fieldCount = recordDescriptor.size();
+
+    int offset = 1;
+
+    for (int i = 0; i < fieldCount; i++) {
+
+        switch(recordDescriptor[i].type) {
+            case TypeVarChar: {
+                int varCharLength = *(int*)((char*)apiRecord + offset);
+
+                char *varChar = (char*)malloc(varCharLength + 1);
+
+                memcpy(varChar, (char*)apiRecord + offset + sizeof(int), varCharLength);
+
+                ((char*)varChar)[varCharLength] = '\0';
+                printf("%s\t|\t", varChar);
+
+                offset += 4 + varCharLength;
+                break;
+            }
+            case TypeInt: {
+                int temp = *(int*)((char*)apiRecord + offset);
+                printf("%d\t|\t", temp);
+
+                offset += 4;
+                break;
+            }
+            case TypeReal: {
+                float temp = *(float*)((char*)apiRecord + offset);
+                printf("%.2f\t|\t", temp);
+                offset += 4;
+                break;
+            }
+            default:
+                printf("Error\t|\t");
+                break;
+        }
+    }
 }

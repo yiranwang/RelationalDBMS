@@ -70,7 +70,21 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key) {
     // if highkey == NULL, scan all the records after low key
     // otherwise check ending condition
     if (highKey != NULL) {
+        if (attrType == TypeInt) {
+            int entryVal = *(int*)entryPtr;
+            int highKeyVal = *(int*)highKey;
+            printf("\nentryPtr val is: %d. ", entryVal);
+            printf("highKey val is: %d\n", highKeyVal);
+        }else {
+            float entryVal = *(float*)entryPtr;
+            float highKeyVal = *(float*)highKey;
+            printf("\nentryPtr val is: %f. ", entryVal);
+            printf("highKey val is: %f\n", highKeyVal);
+        }
+
+
         int cmpResult = ixm->compareKey(entryPtr, highKey, attrType);
+
         // entryKey > high key or entryKey == high key but not inclusive, return EOF
         if (cmpResult > 0 || (cmpResult == 0 && !highKeyInclusive)) {
             delete targetLeafPage;

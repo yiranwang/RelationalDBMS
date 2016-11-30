@@ -175,6 +175,7 @@ class IndexScan : public Iterator
             if(rc == 0)
             {
                 rc = rm.readTuple(tableName.c_str(), rid, data);
+
             }
             return rc;
         };
