@@ -103,17 +103,7 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
 	RecordBasedFileManager *rbfm = RecordBasedFileManager::instance();
 
 	// case 1: pageNum >= totalPageNum
-<<<<<<< Updated upstream
 	if (nextRid.pageNum >= fileHandle.getNumberOfPages()) {
-=======
-	unsigned totalPageNum = fileHandle.getNumberOfPages();
-
-    //printf("totalPageNum is: %d", totalPageNum);
-    //printf("nextRid.pageNum is: %d\n", nextRid.pageNum);
-
-	if (nextRid.pageNum >= totalPageNum) {
-		if(DEBUG) printf("RBFM_EOF reached!\n");
->>>>>>> Stashed changes
 		return RBFM_EOF;
 	}
 
@@ -238,10 +228,7 @@ bool RBFM_ScanIterator::opCompare(void* ref1, void* ref2, CompOp op, AttrType ty
 
         int res = str1.compare(str2);
 
-<<<<<<< Updated upstream
-        printf("compare(%s and %s) = %d\n", str1.c_str(), str2.c_str(), res);
 
-=======
         if (strcmp(str1.c_str(), "Msg27255") == 0) {
 
         }
@@ -251,7 +238,6 @@ bool RBFM_ScanIterator::opCompare(void* ref1, void* ref2, CompOp op, AttrType ty
 
         free(stemp1);
         free(stemp2);
->>>>>>> Stashed changes
 
 		switch (op) {
 			case EQ_OP: return res == 0;
