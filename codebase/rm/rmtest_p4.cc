@@ -42,7 +42,6 @@ int TEST_RM_PRIVATE_4(const string &tableName)
     	sender_location = *(float *)((char *)returnedData + 1);
     	send_time = *(float *)((char *)returnedData + 5);
 
-        printf("location: %f, time: %f\n", sender_location, send_time);
     	    
         if (!(sender_location >= 0.0 || sender_location <= 98.0 || send_time >= 2000.0 || send_time <= 2098.0))
         {

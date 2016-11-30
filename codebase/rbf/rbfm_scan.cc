@@ -229,7 +229,6 @@ bool RBFM_ScanIterator::opCompare(void* ref1, void* ref2, CompOp op, AttrType ty
         int res = str1.compare(str2);
 
         //printf("compar(%s, %s) = res\n", );
-
         switch (op) {
             case EQ_OP: return res == 0;
             case LT_OP: return res < 0;
@@ -239,6 +238,7 @@ bool RBFM_ScanIterator::opCompare(void* ref1, void* ref2, CompOp op, AttrType ty
             case NE_OP: return res != 0;
             default: return false;
         }
+
     }
     else if (type == TypeInt) {
         int int1 = *(int*)ref1;
