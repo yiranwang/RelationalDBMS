@@ -92,6 +92,11 @@ public:
     // the latest table id (or largest, since it's increasing monotonically)
     int lastTableId;
 
+    bool creatingTable;
+    bool deletingTable;
+    bool insertingIndex;
+    bool deletingIndex;
+
    
     // ======= start of self defined functions =====
     void prepareApiTableRecord(const int tableId, const string &tableName, const string &fileName, void *data, int &size); 

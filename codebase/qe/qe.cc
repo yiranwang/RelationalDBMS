@@ -535,10 +535,10 @@ RC INLJoin::getNextTuple(void *data) {
 
         int rc = leftIn->getNextTuple(leftTupleData);
 
-        //printf("\n-----------INJoin getNextTuple Done!----------------------\n");
+        /*printf("\n-----------INJoin getNextTuple Done!----------------------\n");
 
-        //printf("leftTupleData:");
-        //printAPIRecord(leftAttrs, leftTupleData);
+        printf("leftTupleData:");
+        printAPIRecord(leftAttrs, leftTupleData);*/
 
         if (rc == -1) {
             break;
@@ -573,8 +573,8 @@ RC INLJoin::getNextTuple(void *data) {
         }
     }
 
-    //printf("\nrightTupleData:");
-    //printAPIRecord(rightAttrs, rightTupleData);
+    /*printf("\nrightTupleData:");
+    printAPIRecord(rightAttrs, rightTupleData);*/
 
     if (!find) {
         /*printf("--------------------------------------------------------------------");
@@ -733,69 +733,56 @@ RC GHJoin::getNextTuple(void *data) {
         return 0;
     }
 
-    vector<Attribute> streamAttrs;
 
     if (inmemoryMap.empty()) {
         if (nextPartitionNum >= numPartitions) {
             return EOF;
         }
-        loadData(streamAttrs); //build inmemory hash table using inMemoryName table
+        loadData(); //build inmemory hash table using inMemoryName table
     }
 
-    vector<string> streamAttrNames;
-    for (int i = 0; i < leftAttrs.size(); i++) {
-        streamAttrNames.push_back(leftAttrs[i].name);
-    }
-
-    FileHandle fileHandle;
-    rbfm->openFile(streamName, fileHandle);
-
-    RBFM_ScanIterator rbfm_scanIterator;
-
-    rbfm->scan(fileHandle, streamAttrs, "", NO_OP, NULL, streamAttrNames, rbfm_scanIterator);
 
     bool find = false;
     RID rid;
 
     void* tupleData = malloc(PAGE_SIZE);
 
-    while (rbfm_scanIterator.getNextRecord(rid, tupleData) != EOF) {
+    while (GHJ_rbfm_scanIterator->getNextRecord(rid, tupleData) != EOF) {
         string streamNameTemp = streamName.substr(0, streamName.find("_"));
 
-        printf("\nstreamName: %s\n", streamNameTemp.c_str());
-        printAPIRecord(streamAttrs, tupleData);
-        printf("\n");
-
-        vector<Attribute> inMeomoryAttrs;
         string inMemoryAttr;
         string streamAttr;
 
         // stream data coming from leftIn
-        if (strcmp(streamNameTemp.c_str(), "left")) {
-            inMeomoryAttrs = rightAttrs;
+        if (strcmp(streamNameTemp.c_str(), "left") == 0) {
             inMemoryAttr = rightAttr;
             streamAttr = leftAttr;
 
         }else {
-            inMeomoryAttrs = leftAttrs;
             inMemoryAttr = leftAttr;
             streamAttr = rightAttr;
         }
 
+        /*printf("\nstreamName: %s\n", streamNameTemp.c_str());
+        printAPIRecord(streamAttrs, tupleData);
+        printf("\n");*/
+
         string key;
         getKeyAndValue(tupleData, streamAttr, streamAttrs, key);
+
+        //printf("\nkey is: %s\n", key.c_str());
 
         int keyCount = (int)inmemoryMap.count(key);
         auto iter = inmemoryMap.find(key);
 
         for (int i = 0; i < keyCount; i++) {
             void* unionData;
-            if (strcmp(streamNameTemp.c_str(), "left")) {
+            if (strcmp(streamNameTemp.c_str(), "left") == 0) {
 
-                unionData = unionLeft(tupleData, iter->second, streamAttrs, inMeomoryAttrs);
+                unionData = unionLeft(tupleData, iter->second, streamAttrs, inMemoryAttrs);
 
             }else {
-                unionData = unionLeft(iter->second, tupleData, inMeomoryAttrs, streamAttrs);
+                unionData = unionLeft(iter->second, tupleData, inMemoryAttrs, streamAttrs);
             }
 
             int unionDataLen = calculateBytes(attrs, unionData);
@@ -813,9 +800,7 @@ RC GHJoin::getNextTuple(void *data) {
             break;
         }
     }
-
-    rbfm_scanIterator.close();
-    rbfm->closeFile(fileHandle);
+    free(tupleData);
 
     if (find) {
         return this->getNextTuple(data);
@@ -826,6 +811,12 @@ RC GHJoin::getNextTuple(void *data) {
         }
         inmemoryMap.clear();
 
+        GHJ_rbfm_scanIterator->close();
+        delete(GHJ_rbfm_scanIterator);
+
+        rbfm->closeFile(GHJ_fileHandle);
+
+
         string leftname = "left_" + this->left_suffix + "_" + intToString(nextPartitionNum - 1);
         string rightname = "right_" + this->right_suffix + "_" + intToString(nextPartitionNum - 1);
 
@@ -835,13 +826,13 @@ RC GHJoin::getNextTuple(void *data) {
         return this->getNextTuple(data);
     }
 
-    free(tupleData);
     return 0;
 }
 
 
-void GHJoin::loadData(vector<Attribute> &streamAttrs) {
+void GHJoin::loadData() {
     RecordBasedFileManager *rbfm = RecordBasedFileManager::instance();
+    RecordBasedFileManager *rbfmScan = RecordBasedFileManager::instance();
 
     vector<Attribute> leftAttrs;
     vector<Attribute> rightAttrs;
@@ -865,26 +856,40 @@ void GHJoin::loadData(vector<Attribute> &streamAttrs) {
     rbfm->closeFile(fileHandle);
 
     // used left partition as hash table in memory
-    if (leftPartitionPages >= rightPartitionPages) {
+    if (leftPartitionPages <= rightPartitionPages) {
         inMemoryName = leftName;
         streamName = rightName;
         streamAttrs = rightAttrs;
+        inMemoryAttrs = leftAttrs;
 
-        buildHashTable(rbfm, leftName, leftAttr, leftAttrs);
+        buildHashTable(rbfm, rbfmScan, leftAttr);
 
     // used right partition as hash table in memory
     }else {
         inMemoryName = rightName;
         streamName = leftName;
         streamAttrs = leftAttrs;
+        inMemoryAttrs = rightAttrs;
 
-        buildHashTable(rbfm, rightName, rightAttr, rightAttrs);
+        buildHashTable(rbfm, rbfmScan, rightAttr);
 
     }
+
+    GHJ_rbfm_scanIterator = new RBFM_ScanIterator();
+
+    vector<string> streamAttrNames;
+    for (int i = 0; i < streamAttrs.size(); i++) {
+        streamAttrNames.push_back(streamAttrs[i].name);
+    }
+
+    //FileHandle fileHandle;
+    rbfm->openFile(streamName, GHJ_fileHandle);
+
+    rbfmScan->scan(GHJ_fileHandle, streamAttrs, "", NO_OP, NULL, streamAttrNames, *GHJ_rbfm_scanIterator);
 }
 
 
-void GHJoin::buildHashTable(RecordBasedFileManager *rbfm, string inMemoryName, string inMemoryAttr, vector<Attribute> inMemoryAttrs) {
+void GHJoin::buildHashTable(RecordBasedFileManager *rbfm, RecordBasedFileManager *rbfmScan, string inMemoryAttr) {
 
     vector<string> inMemoryAttrNames;
 
@@ -896,7 +901,7 @@ void GHJoin::buildHashTable(RecordBasedFileManager *rbfm, string inMemoryName, s
     rbfm->openFile(inMemoryName, fileHandle);
 
     RBFM_ScanIterator inMemoryRbfmScanIterator;
-    rbfm->scan(fileHandle, inMemoryAttrs, "", NO_OP, NULL, inMemoryAttrNames, inMemoryRbfmScanIterator);
+    rbfmScan->scan(fileHandle, inMemoryAttrs, "", NO_OP, NULL, inMemoryAttrNames, inMemoryRbfmScanIterator);
 
     void *tupleData = malloc(PAGE_SIZE);
     RID rid;
@@ -904,9 +909,9 @@ void GHJoin::buildHashTable(RecordBasedFileManager *rbfm, string inMemoryName, s
     // build inmemory hash table
     while (inMemoryRbfmScanIterator.getNextRecord(rid, tupleData) != EOF) {
 
-        printf("\ninMemoryName: %s\n", inMemoryName.c_str());
+        /*printf("\ninMemoryName: %s\n", inMemoryName.c_str());
         printAPIRecord(inMemoryAttrs, tupleData);
-        printf("\n");
+        printf("\n");*/
 
         string key;
         getKeyAndValue(tupleData, inMemoryAttr, inMemoryAttrs, key);

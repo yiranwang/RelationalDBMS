@@ -98,95 +98,103 @@ RC RBFM_ScanIterator::getNextRecord(RID &rid, void *data) {
     if (!opened || (conditionAttrIndex == recordDescriptor.size() && op != NO_OP)) {
         return RBFM_EOF;
     }
+    //bool conditionMeet = false;
+
+    while (nextRid.pageNum < fileHandle.getNumberOfPages()) {
+        RecordBasedFileManager *rbfm = RecordBasedFileManager::instance();
+
+        // read out the page
+        Page *page = new Page;
+        if (fileHandle.readPage(nextRid.pageNum, page) < 0) {
+            delete page;
+            return -1;
+        }
+
+        ;
+
+        // case 2: invalid slotNum
+        if (nextRid.slotNum > page->header.slotCount) {
+            delete page;
+            return -1;
+        }
+
+        // case 3: previous record visited is the last one on this page, need to scan next page
+        if (nextRid.slotNum == (unsigned)(page->header.slotCount)) {
+            nextRid.pageNum += 1;
+            nextRid.slotNum = 0;
+            delete page;
+            continue;
+            //return getNextRecord(rid, data);
+        }
 
 
-    RecordBasedFileManager *rbfm = RecordBasedFileManager::instance();
+        // case 4: previous record is not the last record on this page, we continue on this page
+        Slot targetSlot = {};
+
+        // read out the slot
+        rbfm->readSlotFromPage(page, (short)nextRid.slotNum, targetSlot);
+
+        // case 4.1: the next slot points to a deleted record or it's redirected from somewhere else, skip it
+        if (targetSlot.offset == -1 || targetSlot.isRedirected != 0) {
+            delete page;
+            nextRid.slotNum += 1;						// go for next slot
+            continue;
+            //return getNextRecord(rid, data);
+        }
+
+
+        // ****************************** general case ******************************
+
+        // case 4.2: the target record is on this page
+
+        // read out the inner record
+        void *tmpInnerRecord = malloc(PAGE_SIZE);
+        memset(tmpInnerRecord, 0, PAGE_SIZE);
+        rbfm->readRecordFromPage(page, targetSlot.offset, targetSlot.length, tmpInnerRecord);
+        delete page;
+
+        // comparison is needed only if op != NO_OP
+        // conditionAttriIndex is a valid index now, otherwise -1 is returned at the beginning of this function
+        if (op != NO_OP) {
+            // read out the attribute value to be compared
+            void *attributeData = malloc(300);
+            memset(attributeData, 0, 300);
+            rbfm->readAttributeFromInnerRecord(recordDescriptor, tmpInnerRecord, conditionAttrIndex, attributeData);
+
+            // attributeData's 1st byte is nullIndicator: 10000000 means it's NULL
+            // case 4.2.1: this attribute is NULL or condition not met, skip this record
+            if (*(unsigned char*)attributeData != 0 ||
+                !opCompare((char*)attributeData + 1, value, op, (recordDescriptor[conditionAttrIndex]).type)) {
+
+                free(tmpInnerRecord);
+                free(attributeData);
+                nextRid.slotNum += 1;						// go for next slot
+                //return getNextRecord(rid, data);
+                continue;
+            }
+            free(attributeData);
+        }
+
+        // case 4.2.2: condition met, compose a tuple of this record into data
+        short tupleSize = 0;
+        rbfm->composeApiTuple(recordDescriptor, projectedDescriptorIndex, tmpInnerRecord, data, tupleSize);
+
+        rid.pageNum = nextRid.pageNum;
+        rid.slotNum = nextRid.slotNum;
+
+        free(tmpInnerRecord);
+
+        nextRid.slotNum += 1;						// go for next slot
+
+        return 0;
+    }
 
     // case 1: pageNum >= totalPageNum
-    if (nextRid.pageNum >= fileHandle.getNumberOfPages()) {
+
+    /*if (nextRid.pageNum >= fileHandle.getNumberOfPages()) {
         return RBFM_EOF;
-    }
-
-    // read out the page
-    Page *page = new Page;
-    if (fileHandle.readPage(nextRid.pageNum, page) < 0) {
-        delete page;
-        return -1;
-    }
-
-    ;
-
-    // case 2: invalid slotNum
-    if (nextRid.slotNum > page->header.slotCount) {
-        delete page;
-        return -1;
-    }
-
-    // case 3: previous record visited is the last one on this page, need to scan next page
-    if (nextRid.slotNum == (unsigned)(page->header.slotCount)) {
-        nextRid.pageNum += 1;
-        nextRid.slotNum = 0;
-        delete page;
-        return getNextRecord(rid, data);
-    }
-
-
-    // case 4: previous record is not the last record on this page, we continue on this page
-    Slot targetSlot = {};
-
-    // read out the slot
-    rbfm->readSlotFromPage(page, (short)nextRid.slotNum, targetSlot);
-
-    // case 4.1: the next slot points to a deleted record or it's redirected from somewhere else, skip it
-    if (targetSlot.offset == -1 || targetSlot.isRedirected != 0) {
-        delete page;
-        nextRid.slotNum += 1;						// go for next slot
-        return getNextRecord(rid, data);
-    }
-
-
-    // ****************************** general case ******************************
-
-    // case 4.2: the target record is on this page
-
-    // read out the inner record
-    void *tmpInnerRecord = malloc(PAGE_SIZE);
-    memset(tmpInnerRecord, 0, PAGE_SIZE);
-    rbfm->readRecordFromPage(page, targetSlot.offset, targetSlot.length, tmpInnerRecord);
-    delete page;
-
-    // comparison is needed only if op != NO_OP
-    // conditionAttriIndex is a valid index now, otherwise -1 is returned at the beginning of this function
-    if (op != NO_OP) {
-        // read out the attribute value to be compared
-        void *attributeData = malloc(300);
-        memset(attributeData, 0, 300);
-        rbfm->readAttributeFromInnerRecord(recordDescriptor, tmpInnerRecord, conditionAttrIndex, attributeData);
-
-        // attributeData's 1st byte is nullIndicator: 10000000 means it's NULL
-        // case 4.2.1: this attribute is NULL or condition not met, skip this record
-        if (*(unsigned char*)attributeData != 0 ||
-            !opCompare((char*)attributeData + 1, value, op, (recordDescriptor[conditionAttrIndex]).type)) {
-
-            free(tmpInnerRecord);
-            free(attributeData);
-            nextRid.slotNum += 1;						// go for next slot
-            return getNextRecord(rid, data);
-        }
-        free(attributeData);
-    }
-    // case 4.2.2: condition met, compose a tuple of this record into data
-    short tupleSize = 0;
-    rbfm->composeApiTuple(recordDescriptor, projectedDescriptorIndex, tmpInnerRecord, data, tupleSize);
-
-    rid.pageNum = nextRid.pageNum;
-    rid.slotNum = nextRid.slotNum;
-
-    free(tmpInnerRecord);
-
-    nextRid.slotNum += 1;						// go for next slot
-
-    return 0;
+    }*/
+    return RBFM_EOF;
 
 };
 

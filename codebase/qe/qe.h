@@ -289,10 +289,16 @@ class GHJoin : public Iterator {
     private:
         bool build;
         string inMemoryName;
+        vector<Attribute> inMemoryAttrs;
+
         string streamName;
+        vector<Attribute> streamAttrs;
+
         multimap<string,void*> inmemoryMap;
         queue<void*> resultQueue;
         int nextPartitionNum;
+        RBFM_ScanIterator *GHJ_rbfm_scanIterator;
+        FileHandle GHJ_fileHandle;
 
     public:
         Iterator *leftIn;
@@ -311,8 +317,8 @@ class GHJoin : public Iterator {
       ~GHJoin(){};
 
         void buildPartition();
-        void loadData(vector<Attribute> &streamAttrs);
-        void buildHashTable(RecordBasedFileManager *rbfm, string inMemoryName, string inMemoryAttr, vector<Attribute> inMemoryAttrs);
+        void loadData();
+        void buildHashTable(RecordBasedFileManager *rbfm, RecordBasedFileManager *rbfmScan, string inMemoryAttr);
 
       RC getNextTuple(void *data);
       // For attribute in vector<Attribute>, name it as rel.attr

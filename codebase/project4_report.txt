@@ -1,0 +1,85 @@
+1. Basic information
+Team number (e.g., 01) : 
+#1 Student ID : 20809476
+#1 Student Name : Yue DING
+#2 Student ID : 
+#2 Student Name : Rui LIU
+OS (bit) :
+gcc version :
+
+
+2. Catalog information about Index
+- Show your catalog information about an index (tables, columns). 
+
+ We add a new catalog - “Indices” to store the the indexes of different tables and different attributes.
+
+
+Tables 
+table-id:int | table-name:varchar(50) | file-name:varchar(50)
+
+Columns
+table-id:int | column-name:varchar(50) | column-type:int | column-length:int | column-position:int
+
+Indices
+table-id:int | index-name:varchar(50) | index-type:int| index-length:int | index-position:int
+
+
+Tables 
+(1, ”Tables", "Tables")
+(2, "Columns", "Columns")
+(3, ”Indices”, “Indices”)
+
+
+Columns
+(1, “table-id", TypeInt, 4 , 1)
+(1, "table-name", TypeVarChar, 50, 2)
+(1, "file-name", TypeVarChar, 50, 3)
+(2, "table-id", TypeInt, 4, 1)
+(2, "column-name",  TypeVarChar, 50, 2)
+(2, "column-type", TypeInt, 4, 3)
+(2, "column-length", TypeInt, 4, 4)
+(2, "column-position", TypeInt, 4, 5)
+(3, "table-id", TypeInt, 4, 1)
+(3, “index-name",  TypeVarChar, 50, 2)
+(3, “index-type", TypeInt, 4, 3)
+(3, “index-length", TypeInt, 4, 4)
+(3, “index-position", TypeInt, 4, 5)
+
+
+3. Block Nested Loop Join (If you have implemented this feature)
+- Describe how your block nested loop join works (especially, how you manage the given buffers.)
+
+ We use the in memory hash table to store and hash the records of left input. When the size of hash table reaches the buffer size limit, we load the record to the buffer memory of right input(one page size), and match the right input with the records in hash table. We also use one page size buffer to store the output record. Whenever the right record is used, we reload the new record from right input; whenever the output is ready, we flush out the output record; whenever the records in left block hash table are used up, we reload the block with new records.
+
+
+4. Index Nested Loop Join (If you have implemented this feature)
+- Describe how your grace hash join works.
+
+ Since the attribute in join has indexes, when we scan the left input, we can set the scan condition for the right input. As a result, the output from the right scan is what we want. We use a queue to store the output generated from the scan of right input. Whenever the queue is empty, we generate the next tuple from left input.
+
+5. Grace Hash Join (If you have implemented this feature)
+- Describe how your grace hash join works (especially, in-memory structure).
+
+ For the in-memory structure, we use the map. We first get the key. All keys here are VarCharType, and if the attribute is null, it begins with “1”, otherwise it begins with ”0”, following by its real value. And then we get the hash value of the key. Since we have the number of partitions, we calculate the bucket index using hash(key) % numPartitions.
+ If the page number of each partition is used to decide which input is inner or outer(the small one should load as the in memory hash table).
+
+
+6. Aggregation
+- Describe how your aggregation (basic, group-based hash) works.
+
+ Basic aggregation: scan records, and maintain the min, max, sum, count, avg value, then we can get the result.
+ Group-based aggregation: we use a map to store result(key is the aggregate attribute, and value is the current min, max, sum, count and avg).
+
+7. Implementation Detail
+- Have you added your own source file (.cc or .h)?
+ Yes, qe_aux.cc
+
+- Have you implemented any optional features? Then, describe them here.
+  Yes, we implemented Grace Hash Join and group-based aggregation.
+
+- Other implementation details:
+
+
+6. Other (optional)
+- Freely use this section to tell us about things that are related to the project 4, but not related to the other sections (optional)
+

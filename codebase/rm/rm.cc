@@ -345,7 +345,9 @@ RC RelationManager::deleteCatalog() {
 }
 
 RC RelationManager::createTable(const string &tableName, const vector<Attribute> &attrs) {
-    
+
+    creatingTable = true;
+
     lastTableId++;
     //printf("Creating table %s. Its table id is %d\n", tableName.c_str(), lastTableId);
     RID rid;
@@ -353,6 +355,9 @@ RC RelationManager::createTable(const string &tableName, const vector<Attribute>
     // create a file for this table to store pages of records
     string fileName = tableName;
     if (rbfm->createFile(fileName) < 0) {
+
+        creatingTable = false;
+
         return -1;
     }
 
@@ -365,6 +370,8 @@ RC RelationManager::createTable(const string &tableName, const vector<Attribute>
 
     if (insertTuple(TABLES_TABLE_NAME, data, rid) < 0) {                                   
         free(data);
+
+        creatingTable = false;
         return -1;
     }
 
@@ -381,16 +388,19 @@ RC RelationManager::createTable(const string &tableName, const vector<Attribute>
 
         if (insertTuple(COLUMNS_FILE_NAME, data, rid) < 0) {
             free(data);
+            creatingTable = false;
             return -1;
         }
     }
 
     free(data);
+    creatingTable = false;
     return 0;
 }
 
 RC RelationManager::deleteTable(const string &tableName) {   
-    if (strcmp(tableName.c_str(), TABLES_TABLE_NAME) == 0 || strcmp(tableName.c_str(), COLUMNS_TABLE_NAME) == 0|| !fexists(tableName)) {
+    if (strcmp(tableName.c_str(), TABLES_TABLE_NAME) == 0 || strcmp(tableName.c_str(), COLUMNS_TABLE_NAME) == 0 ||
+            strcmp(tableName.c_str(), INDICES_TABLE_NAME) == 0 || !fexists(tableName)) {
         return -1;
     }
 
@@ -400,6 +410,7 @@ RC RelationManager::deleteTable(const string &tableName) {
 
     int tableId;
     RID rid;
+    deletingTable = true;
     
     getTableIdByTableName(tableId, rid, tableName);
 
@@ -409,6 +420,7 @@ RC RelationManager::deleteTable(const string &tableName) {
 
     if (rbfm->deleteRecord(tableFileHandle, tableRecordDescriptor, rid) < 0) {
         rbfm->closeFile(tableFileHandle);
+        deletingTable = false;
         return -1;
     }
 
@@ -416,6 +428,7 @@ RC RelationManager::deleteTable(const string &tableName) {
     //rbfm->printTable(tableFileHandle, tableRecordDescriptor);
 
     if (rbfm->closeFile(tableFileHandle) < 0) {
+        deletingTable = false;
         return -1;
     }
 
@@ -438,6 +451,7 @@ RC RelationManager::deleteTable(const string &tableName) {
             if (DEBUG) printf("Error in delete, rmsi closed\n");
             rm_ScanIterator.close();
             free(targetTuple);
+            deletingTable = false;
             return -1;
         }
     }
@@ -450,6 +464,7 @@ RC RelationManager::deleteTable(const string &tableName) {
             if (DEBUG) printf("Error in delete, rmsi closed\n");
             rm_ScanIterator.close();
             free(targetTuple);
+            deletingTable = false;
             return -1;
         }
 
@@ -467,7 +482,7 @@ RC RelationManager::deleteTable(const string &tableName) {
 
     rm_ScanIterator.close();
     free(targetTuple);
-
+    deletingTable = false;
     return 0;
 }
 
@@ -569,7 +584,16 @@ RC RelationManager::getAttributes(const string &tableName, vector<Attribute> &at
     return 0;
 }
 
-RC RelationManager::insertTuple(const string &tableName, const void *data, RID &rid) {   
+RC RelationManager::insertTuple(const string &tableName, const void *data, RID &rid) {
+
+    if (!creatingTable && (strcmp(tableName.c_str(), TABLES_TABLE_NAME) == 0 || strcmp(tableName.c_str(), COLUMNS_TABLE_NAME) == 0)) {
+
+        return -1;
+    }
+
+    if (!insertingIndex && strcmp(tableName.c_str(), INDICES_TABLE_NAME) == 0) {
+        return -1;
+    }
 
     FileHandle fileHandle;
     vector<Attribute> recordDescriptor;
@@ -586,8 +610,14 @@ RC RelationManager::insertTuple(const string &tableName, const void *data, RID &
     }
 
     //insert index
-    if (tableName!="Tables"&&tableName!="Columns"&&tableName!="Indices") {
+    if (strcmp(tableName.c_str(), TABLES_TABLE_NAME) != 0 && strcmp(tableName.c_str(), COLUMNS_TABLE_NAME) != 0 &&
+        strcmp(tableName.c_str(), INDICES_TABLE_NAME) != 0) {
+
+        insertingIndex = true;
+
         insertIndexWithInsertTuple(fileHandle, tableName, recordDescriptor, rid);
+
+        insertingIndex = false;
     }
 
 
@@ -603,6 +633,15 @@ RC RelationManager::insertTuple(const string &tableName, const void *data, RID &
 }
 
 RC RelationManager::deleteTuple(const string &tableName, const RID &rid) {
+    if (!deletingTable && (strcmp(tableName.c_str(), TABLES_TABLE_NAME) == 0 || strcmp(tableName.c_str(), COLUMNS_TABLE_NAME) == 0)) {
+
+        return -1;
+    }
+
+    if (!deletingIndex && strcmp(tableName.c_str(), INDICES_TABLE_NAME) == 0) {
+        return -1;
+    }
+
     FileHandle fileHandle;
     vector<Attribute> recordDescriptor;
 
@@ -618,7 +657,12 @@ RC RelationManager::deleteTuple(const string &tableName, const RID &rid) {
     }
 
     // delete index accordingly
-    deleteIndexWithDeleteTuple(fileHandle, tableName, recordDescriptor, rid);
+    if (strcmp(tableName.c_str(), TABLES_TABLE_NAME) != 0 && strcmp(tableName.c_str(), COLUMNS_TABLE_NAME) != 0 &&
+        strcmp(tableName.c_str(), INDICES_TABLE_NAME) != 0) {
+
+        deleteIndexWithDeleteTuple(fileHandle, tableName, recordDescriptor, rid);
+    }
+
 
     if (rbfm->closeFile(fileHandle) < 0) {
         return -1;
@@ -628,6 +672,11 @@ RC RelationManager::deleteTuple(const string &tableName, const RID &rid) {
 }
 
 RC RelationManager::updateTuple(const string &tableName, const void *data, const RID &rid) {
+    if (strcmp(tableName.c_str(), TABLES_TABLE_NAME) == 0 || strcmp(tableName.c_str(), COLUMNS_TABLE_NAME) == 0) {
+
+        return -1;
+    }
+
     FileHandle fileHandle;
     vector<Attribute> recordDescriptor;
 
@@ -906,6 +955,8 @@ RC RelationManager::createIndex(const string &tableName, const string &attribute
         return -1;
     }
 
+    insertingIndex = true;
+
     void *data = malloc(PAGE_SIZE);
 
     int tableId;
@@ -941,6 +992,9 @@ RC RelationManager::createIndex(const string &tableName, const string &attribute
         assert(!(*(char*)key & (1 << 7))); // there is no NULL key
         ixm->insertEntry(ixFileHandle, attribute, (char*)key + 1, rid);
     }
+
+    insertingIndex = false;
+
     rm_scanIterator.close();
     ixm->closeFile(ixFileHandle);
     free(key);
@@ -955,6 +1009,7 @@ RC RelationManager::destroyIndex(const string &tableName, const string &attribut
     if (tableName == "Tables" || tableName == "Columns" || !fexists(ixname)) {
         return -1;
     }
+    deletingIndex = true;
 
     vector<string> attributes;
     string tableIdSingle="table-id";
@@ -976,6 +1031,8 @@ RC RelationManager::destroyIndex(const string &tableName, const string &attribut
     rm_ScanIterator.close();
 
     deleteTuple(INDICES_TABLE_NAME, rid);
+
+    deletingIndex = false;
 
     free(tupleWithTableId);
     rm_ScanIterator.close();
