@@ -37,6 +37,12 @@ target_link_libraries(qetest_04 ix rbf rm qe)
 add_executable(qetest_05 qetest_05.cc)
 target_link_libraries(qetest_05 ix rbf rm qe)
 
+add_executable(qetest_11 qetest_11.cc)
+target_link_libraries(qetest_11 ix rbf rm qe)
+
+add_executable(qetest_12 qetest_12.cc)
+target_link_libraries(qetest_12 ix rbf rm qe)
+
 add_executable(qetest_13 qetest_13.cc)
 target_link_libraries(qetest_13 ix rbf rm qe)
 

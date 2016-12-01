@@ -613,6 +613,336 @@ void INLJoin::getAttributes(vector<Attribute> &attrs) const{
     }
 }
 
+
+GHJoin::GHJoin(Iterator *leftIn, Iterator *rightIn, const Condition &condition, const unsigned numPartitions){
+    this->build = false;
+    this->leftIn = leftIn;
+    this->rightIn = rightIn;
+    this->condition = condition;
+    this->numPartitions = numPartitions;
+
+    vector<Attribute>leftAttrs;
+    this->leftIn->getAttributes(leftAttrs);
+    string tmp = leftAttrs[0].name;
+    this->left_suffix = tmp.substr(0,leftAttrs[0].name.find("."));
+
+    vector<Attribute>rightAttrs;
+    this->rightIn->getAttributes(rightAttrs);
+    tmp = rightAttrs[0].name;
+    this->right_suffix = tmp.substr(0,tmp.find("."));
+
+    this->inMemoryName = "";
+    this->streamName = "";
+    while (!this->resultQueue.empty()){
+        resultQueue.pop();
+    }
+    this->inmemoryMap.clear();
+    this->nextPartitionNum = 0;
+}
+
+void GHJoin::buildPartition() {
+    RecordBasedFileManager *rbfm = RecordBasedFileManager::instance();
+
+    vector<Attribute> leftAttrs;
+    vector<Attribute> rightAttrs;
+
+    leftIn->getAttributes(leftAttrs);
+    rightIn->getAttributes(rightAttrs);
+
+    string leftAttr = condition.lhsAttr;
+    string rightAttr = condition.rhsAttr;
+
+    for (int i = 0; i < numPartitions; i++) {
+        string leftName = "left_" + left_suffix + "_" + intToString(i);
+        rbfm->createFile(leftName);
+
+        string rightName = "right_" + right_suffix + "_" + intToString(i);
+        rbfm->createFile(rightName);
+    }
+
+    void *tupleData = malloc(PAGE_SIZE);
+
+    hash<string> getHashVal; // used to get hash value of key
+    RID rid;
+
+    // build partition of leftIn, create rbfm files
+    while (leftIn->getNextTuple(tupleData) != EOF) {
+
+        string key;
+        getKeyAndValue(tupleData, leftAttr, leftAttrs, key);
+
+        int index = getHashVal(key) % numPartitions;
+        string leftName = "left_" + left_suffix + "_" + intToString(index);
+
+        FileHandle fileHandle;
+        rbfm->openFile(leftName, fileHandle);
+        rbfm->insertRecord(fileHandle, leftAttrs, tupleData, rid);
+        rbfm->closeFile(fileHandle);
+
+    }
+
+    // build partition of rightIn, create rbfm files
+    while (rightIn->getNextTuple(tupleData) != EOF) {
+
+        string key;
+        getKeyAndValue(tupleData, rightAttr, rightAttrs, key);
+
+        int index = getHashVal(key) % numPartitions;
+        string rightName = "right_" + right_suffix + "_" + intToString(index);
+
+        FileHandle fileHandle;
+        rbfm->openFile(rightName, fileHandle);
+        rbfm->insertRecord(fileHandle, rightAttrs, tupleData, rid);
+        rbfm->closeFile(fileHandle);
+
+    }
+
+    free(tupleData);
+    build = true;
+    return;
+}
+
+
+RC GHJoin::getNextTuple(void *data) {
+    if (!build) {
+        buildPartition();
+    }
+
+    vector<Attribute> leftAttrs;
+    vector<Attribute> rightAttrs;
+    vector<Attribute> attrs;
+
+    leftIn->getAttributes(leftAttrs);
+    rightIn->getAttributes(rightAttrs);
+    this->getAttributes(attrs);
+
+    string leftAttr = condition.lhsAttr;
+    string rightAttr = condition.rhsAttr;
+
+    RecordBasedFileManager *rbfm = RecordBasedFileManager::instance();
+
+    if (!resultQueue.empty()) {
+        void *headData = resultQueue.front();
+
+        int headDataLen = calculateBytes(attrs, headData);
+        memcpy(data, headData, headDataLen);
+
+        resultQueue.pop();
+        free(headData);
+
+        return 0;
+    }
+
+    vector<Attribute> streamAttrs;
+
+    if (inmemoryMap.empty()) {
+        if (nextPartitionNum >= numPartitions) {
+            return EOF;
+        }
+        loadData(streamAttrs); //build inmemory hash table using inMemoryName table
+    }
+
+    vector<string> streamAttrNames;
+    for (int i = 0; i < leftAttrs.size(); i++) {
+        streamAttrNames.push_back(leftAttrs[i].name);
+    }
+
+    FileHandle fileHandle;
+    rbfm->openFile(streamName, fileHandle);
+
+    RBFM_ScanIterator rbfm_scanIterator;
+
+    rbfm->scan(fileHandle, streamAttrs, "", NO_OP, NULL, streamAttrNames, rbfm_scanIterator);
+
+    bool find = false;
+    RID rid;
+
+    void* tupleData = malloc(PAGE_SIZE);
+
+    while (rbfm_scanIterator.getNextRecord(rid, tupleData) != EOF) {
+        string streamNameTemp = streamName.substr(0, streamName.find("_"));
+
+        printf("\nstreamName: %s\n", streamNameTemp.c_str());
+        printAPIRecord(streamAttrs, tupleData);
+        printf("\n");
+
+        vector<Attribute> inMeomoryAttrs;
+        string inMemoryAttr;
+        string streamAttr;
+
+        // stream data coming from leftIn
+        if (strcmp(streamNameTemp.c_str(), "left")) {
+            inMeomoryAttrs = rightAttrs;
+            inMemoryAttr = rightAttr;
+            streamAttr = leftAttr;
+
+        }else {
+            inMeomoryAttrs = leftAttrs;
+            inMemoryAttr = leftAttr;
+            streamAttr = rightAttr;
+        }
+
+        string key;
+        getKeyAndValue(tupleData, streamAttr, streamAttrs, key);
+
+        int keyCount = (int)inmemoryMap.count(key);
+        auto iter = inmemoryMap.find(key);
+
+        for (int i = 0; i < keyCount; i++) {
+            void* unionData;
+            if (strcmp(streamNameTemp.c_str(), "left")) {
+
+                unionData = unionLeft(tupleData, iter->second, streamAttrs, inMeomoryAttrs);
+
+            }else {
+                unionData = unionLeft(iter->second, tupleData, inMeomoryAttrs, streamAttrs);
+            }
+
+            int unionDataLen = calculateBytes(attrs, unionData);
+
+            void* queueData = malloc(unionDataLen);
+            memcpy(queueData, unionData, unionDataLen);
+
+            resultQueue.push(queueData);
+
+            free(unionData);
+            find = true;
+        }
+
+        if (find) {
+            break;
+        }
+    }
+
+    rbfm_scanIterator.close();
+    rbfm->closeFile(fileHandle);
+
+    if (find) {
+        return this->getNextTuple(data);
+
+    }else {
+        for (auto iter = inmemoryMap.begin(); iter!= inmemoryMap.end(); iter++){
+            free(iter->second);
+        }
+        inmemoryMap.clear();
+
+        string leftname = "left_" + this->left_suffix + "_" + intToString(nextPartitionNum - 1);
+        string rightname = "right_" + this->right_suffix + "_" + intToString(nextPartitionNum - 1);
+
+        rbfm->destroyFile(leftname);
+        rbfm->destroyFile(rightname);
+
+        return this->getNextTuple(data);
+    }
+
+    free(tupleData);
+    return 0;
+}
+
+
+void GHJoin::loadData(vector<Attribute> &streamAttrs) {
+    RecordBasedFileManager *rbfm = RecordBasedFileManager::instance();
+
+    vector<Attribute> leftAttrs;
+    vector<Attribute> rightAttrs;
+
+    leftIn->getAttributes(leftAttrs);
+    rightIn->getAttributes(rightAttrs);
+
+    string leftAttr = condition.lhsAttr;
+    string rightAttr = condition.rhsAttr;
+
+    string leftName = "left_" + left_suffix + "_" + intToString(nextPartitionNum);
+    string rightName = "right_" + right_suffix + "_" + intToString(nextPartitionNum);
+
+    FileHandle fileHandle;
+    rbfm->openFile(leftName, fileHandle);
+    int leftPartitionPages = fileHandle.getNumberOfPages(); // number of pages in each partition file
+    rbfm->closeFile(fileHandle);
+
+    rbfm->openFile(rightName, fileHandle);
+    int rightPartitionPages = fileHandle.getNumberOfPages(); // number of pages in each partition file
+    rbfm->closeFile(fileHandle);
+
+    // used left partition as hash table in memory
+    if (leftPartitionPages >= rightPartitionPages) {
+        inMemoryName = leftName;
+        streamName = rightName;
+        streamAttrs = rightAttrs;
+
+        buildHashTable(rbfm, leftName, leftAttr, leftAttrs);
+
+    // used right partition as hash table in memory
+    }else {
+        inMemoryName = rightName;
+        streamName = leftName;
+        streamAttrs = leftAttrs;
+
+        buildHashTable(rbfm, rightName, rightAttr, rightAttrs);
+
+    }
+}
+
+
+void GHJoin::buildHashTable(RecordBasedFileManager *rbfm, string inMemoryName, string inMemoryAttr, vector<Attribute> inMemoryAttrs) {
+
+    vector<string> inMemoryAttrNames;
+
+    for (int i = 0; i < inMemoryAttrs.size(); i++) {
+        inMemoryAttrNames.push_back(inMemoryAttrs[i].name);
+    }
+
+    FileHandle fileHandle;
+    rbfm->openFile(inMemoryName, fileHandle);
+
+    RBFM_ScanIterator inMemoryRbfmScanIterator;
+    rbfm->scan(fileHandle, inMemoryAttrs, "", NO_OP, NULL, inMemoryAttrNames, inMemoryRbfmScanIterator);
+
+    void *tupleData = malloc(PAGE_SIZE);
+    RID rid;
+
+    // build inmemory hash table
+    while (inMemoryRbfmScanIterator.getNextRecord(rid, tupleData) != EOF) {
+
+        printf("\ninMemoryName: %s\n", inMemoryName.c_str());
+        printAPIRecord(inMemoryAttrs, tupleData);
+        printf("\n");
+
+        string key;
+        getKeyAndValue(tupleData, inMemoryAttr, inMemoryAttrs, key);
+
+        int tupleDataLen = calculateBytes(inMemoryAttrs, tupleData);
+        void *inMemoryData = malloc(tupleDataLen);
+        memcpy(inMemoryData, tupleData, tupleDataLen);
+
+        inmemoryMap.insert(pair<string, void*>(key, inMemoryData));
+    }
+
+    inMemoryRbfmScanIterator.close();
+    rbfm->closeFile(fileHandle);
+    free(tupleData);
+
+    nextPartitionNum++;
+}
+
+
+void GHJoin::getAttributes(vector<Attribute> &attrs) const{
+    attrs.clear();
+    vector<Attribute> leftAttrs;
+    vector<Attribute> rightAttrs;
+
+    leftIn->getAttributes(leftAttrs);
+    rightIn->getAttributes(rightAttrs);
+
+    for(int i =0; i < leftAttrs.size();i++){
+        attrs.push_back(leftAttrs[i]);
+    }
+    for(int i = 0; i < rightAttrs.size(); i++){
+        attrs.push_back(rightAttrs[i]);
+    }
+}
+
+
 // self defined comparator for aggregation
 struct AggreMapComparator {
     bool operator() (const KeyAndValue& left, const KeyAndValue& right) const

@@ -235,3 +235,19 @@ void printAPIRecord(const vector<Attribute> &recordDescriptor, void *apiRecord) 
         }
     }
 }
+
+string intToString(int t){
+    stringstream ss;
+    ss << t;
+    string ans;
+    ss >> ans;
+    return ans;
+}
+
+string floatToString(float t){
+    stringstream ss;
+    ss << t;
+    string ans;
+    ss >> ans;
+    return ans;
+}

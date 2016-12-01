@@ -286,17 +286,37 @@ class INLJoin : public Iterator {
 // Optional for everyone. 10 extra-credit points
 class GHJoin : public Iterator {
     // Grace hash join operator
+    private:
+        bool build;
+        string inMemoryName;
+        string streamName;
+        multimap<string,void*> inmemoryMap;
+        queue<void*> resultQueue;
+        int nextPartitionNum;
+
     public:
+        Iterator *leftIn;
+        Iterator *rightIn;
+        Condition condition;
+        unsigned numPartitions;
+        string left_suffix;
+        string right_suffix;
+
+
       GHJoin(Iterator *leftIn,               // Iterator of input R
             Iterator *rightIn,               // Iterator of input S
             const Condition &condition,      // Join condition (CompOp is always EQ)
             const unsigned numPartitions     // # of partitions for each relation (decided by the optimizer)
-      ){};
+      );
       ~GHJoin(){};
 
-      RC getNextTuple(void *data){return QE_EOF;};
+        void buildPartition();
+        void loadData(vector<Attribute> &streamAttrs);
+        void buildHashTable(RecordBasedFileManager *rbfm, string inMemoryName, string inMemoryAttr, vector<Attribute> inMemoryAttrs);
+
+      RC getNextTuple(void *data);
       // For attribute in vector<Attribute>, name it as rel.attr
-      void getAttributes(vector<Attribute> &attrs) const{};
+      void getAttributes(vector<Attribute> &attrs) const;
 };
 
 class Aggregate : public Iterator {

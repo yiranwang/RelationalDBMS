@@ -136,25 +136,26 @@ int main() {
 	// Indexes created: none
 
 	// Create left/right large table, and populate the table
-	if (createLargeLeftTable() != success) {
-		cerr << "***** [FAIL] QE Test Case 11 failed. *****" << endl;
-		return fail;
-	}
 
-	if (populateLargeLeftTable() != success) {
-		cerr << "***** [FAIL] QE Test Case 11 failed. *****" << endl;
-		return fail;
-	}
-
-	if (createLargeRightTable() != success) {
-		cerr << "***** [FAIL] QE Test Case 11 failed. *****" << endl;
-		return fail;
-	}
-
-	if (populateLargeRightTable() != success) {
-		cerr << "***** [FAIL] QE Test Case 11 failed. *****" << endl;
-		return fail;
-	}
+//	if (createLargeLeftTable() != success) {
+//		cerr << "***** [FAIL] QE Test Case 11 failed. *****" << endl;
+//		return fail;
+//	}
+//
+//	if (populateLargeLeftTable() != success) {
+//		cerr << "***** [FAIL] QE Test Case 11 failed. *****" << endl;
+//		return fail;
+//	}
+//
+//	if (createLargeRightTable() != success) {
+//		cerr << "***** [FAIL] QE Test Case 11 failed. *****" << endl;
+//		return fail;
+//	}
+//
+//	if (populateLargeRightTable() != success) {
+//		cerr << "***** [FAIL] QE Test Case 11 failed. *****" << endl;
+//		return fail;
+//	}
 	
 	if (testCase_11() != success) {
 		cerr << "***** [FAIL] QE Test Case 11 failed. *****" << endl;
