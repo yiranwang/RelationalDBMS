@@ -42,11 +42,6 @@ RC testCase_11() {
 	while (ghJoin->getNextTuple(data) != QE_EOF) {
 
 		// At this point, partitions should be on disk.
-        //printf("actualResultCnt is: %d\n", actualResultCnt);
-
-        if (actualResultCnt == 5108) {
-
-        }
 
 		if (actualResultCnt % 5000 == 0) {
 			cerr << "Processing " << actualResultCnt << " of " << largeTupleCount << " tuples." << endl;
@@ -141,8 +136,7 @@ int main() {
 	// Indexes created: none
 
 	// Create left/right large table, and populate the table
-
-/*	if (createLargeLeftTable() != success) {
+	if (createLargeLeftTable() != success) {
 		cerr << "***** [FAIL] QE Test Case 11 failed. *****" << endl;
 		return fail;
 	}
@@ -160,7 +154,7 @@ int main() {
 	if (populateLargeRightTable() != success) {
 		cerr << "***** [FAIL] QE Test Case 11 failed. *****" << endl;
 		return fail;
-	}*/
+	}
 	
 	if (testCase_11() != success) {
 		cerr << "***** [FAIL] QE Test Case 11 failed. *****" << endl;

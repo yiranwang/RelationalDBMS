@@ -72,7 +72,7 @@ RC testCase_9() {
 		offset += sizeof(float);
 
 		// Is an attribute right.B NULL?
-		nullBit = *(unsigned char *)((char *)data) & (1 << 5);
+		nullBit = *(unsigned char *)((char *)data) & (1 << 4);
 		if (nullBit) {
 			cerr << endl << "***** A returned value is not correct. *****" << endl;
 			goto clean_up;
@@ -82,7 +82,7 @@ RC testCase_9() {
 		offset += sizeof(int);
 
 		// Is an attribute right.C NULL?
-		nullBit = *(unsigned char *)((char *)data) & (1 << 4);
+		nullBit = *(unsigned char *)((char *)data) & (1 << 3);
 		if (nullBit) {
 			cerr << endl << "***** A returned value is not correct. *****" << endl;
 			goto clean_up;
@@ -98,7 +98,7 @@ RC testCase_9() {
 		}
 
 		// Is an attribute right.C NULL?
-		nullBit = *(unsigned char *)((char *)data) & (1 << 3);
+		nullBit = *(unsigned char *)((char *)data) & (1 << 2);
 		if (nullBit) {
 			cerr << endl << "***** A returned value is not correct. *****" << endl;
 			goto clean_up;

@@ -42,42 +42,6 @@ int testCase_10() {
 	attrNames.push_back("left.C");
 	Project *project = new Project(filter, attrNames);
 
-	void *data = malloc(bufSize);
-	bool nullBit = false;
-
-/*	while (filter->getNextTuple(data) != QE_EOF) {
-		int offset = 0;
-
-		// Is an attribute left.A NULL?
-		nullBit = *(unsigned char *) ((char *) data) & (1 << 7);
-		if (nullBit) {
-			cerr << endl << "***** A returned value is not correct. *****" << endl;
-			//goto clean_up;
-		}
-		// Print left.A
-		cerr << "left.A " << *(int *) ((char *) data + offset + 1);
-		offset += sizeof(int);
-
-		// Is an attribute left.C NULL?
-		nullBit = *(unsigned char *) ((char *) data) & (1 << 6);
-		if (nullBit) {
-			cerr << endl << "***** A returned value is not correct. *****" << endl;
-			//goto clean_up;
-		}
-
-        // Print left.B
-        cerr << "left.B " << *(int *) ((char *) data + offset + 1);
-        offset += sizeof(int);
-
-		// Print left.C
-		cerr << "  left.C " << *(float *) ((char *) data + offset + 1);
-		offset += sizeof(float);
-
-		memset(data, 0, bufSize);
-		//actualResultCnt++;
-	}*/
-
-
 	Condition cond_j;
 	cond_j.lhsAttr = "left.C";
 	cond_j.op = EQ_OP;
@@ -95,6 +59,8 @@ int testCase_10() {
 	float valueC = 0;
 
 	// Go over the data through iterator
+	void *data = malloc(bufSize);
+	bool nullBit = false;
 
 	while (join->getNextTuple(data) != QE_EOF) {
 		int offset = 0;
@@ -151,7 +117,7 @@ int testCase_10() {
 			goto clean_up;
 		}
 		// Print right.D
-		cerr << "  right.D " << *(int *) ((char *) data + offset + 1) << endl;
+		cerr << "  right.D " << *(int *) ((char *) data + offset + 1);
 		offset += sizeof(int);
 
 		memset(data, 0, bufSize);
