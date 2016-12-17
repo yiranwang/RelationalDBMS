@@ -61,7 +61,7 @@ RC IX_ScanIterator::getNextEntry(RID &rid, void *key) {
             delete(targetLeafPage);
             offsetOfCurrentEntry = offsetOfNextEntry;
             offsetOfNextEntry += keyLen + sizeof(RID);
-            return getNextEntry(rid, key);
+            return getNextEntry(rid, key);        //TODO: change this into while loop, recursive call can result in stack overflow
         }
     }
 
